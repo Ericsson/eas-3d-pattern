@@ -1,0 +1,341 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema#",
+
+  "type": "object",
+  "properties": {
+    "BASTA_AA_WP_version": {
+      "type": "string"
+    },
+    "Supplier": {
+      "type": "string"
+    },
+    "Antenna_Model": {
+      "type": "string"
+    },
+    "Antenna_Type": {
+      "type": "string"
+    },
+    "Revision_Version": {
+      "type": "string"
+    },
+    "Released_Date": {
+      "type": "string",
+      "format": "date"
+    },
+    "Coordinate_System": {
+      "type": "string",
+      "enum": [
+        "SPCS_Polar",
+        "SPCS_CW",
+        "SPCS_CCW",
+        "SPCS_Geo"
+      ]
+    },
+    "Pattern_Name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Beam_ID": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Pattern_Type": {
+      "type": "string",
+      "enum": [
+        "Broadcast Beam",
+        "Broadcast Configuration Envelope",
+        "Traffic Beam",
+        "Traffic Envelope",
+        "Uplink",
+        "Generic"
+      ]
+    },
+    "Frequency": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz",
+            "THz"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "Frequency_Range": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz",
+            "THz"
+          ]
+        }
+      },
+      "required": [
+        "lower",
+        "upper",
+        "unit"
+      ]
+    },
+    "EIRP": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "mW",
+            "W",
+            "dBW",
+            "dBm"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "Configured_Output_Power": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "mW",
+            "W",
+            "dBW",
+            "dBm"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "Gain": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "dBi",
+            "dBd"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "Configuration": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "RF_Port": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Array_ID": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Array_Position": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Phi_HPBW": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "Theta_HPBW": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "Front_to_Back": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "Phi_Electrical_Pan": {
+       "type": [
+          "number",
+          "null"
+        ]
+    },
+    "Theta_Electrical_Tilt": {
+       "type": [
+          "number",
+          "null"
+        ]
+    },
+    "Nominal_Polarization": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Total",
+            "P45",
+            "M45",
+            "P45M45",
+            "M45P45",
+            "H",
+            "V",
+            "HV",
+            "VH",
+            "RHC",
+            "LHC"
+          ]
+        },
+        {
+          "$comment": "M### or P###M### for Negative|Positive ### degrees (### is an integer, max. 3 digits)",
+          "type": "string",
+          "pattern": "^(P[0-9]{1,3})?M[0-9]{1,3}$"
+        },
+        {
+          "$comment": "P### or M###P### for Positive|Negative ### degrees (### is an integer, max. 3 digits)",
+          "type": "string",
+          "pattern": "^(M[0-9]{1,3})?P[0-9]{1,3}$"
+        }
+      ]
+    },
+    "Theta_Sampling": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "Phi_Sampling": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "Data_Set_Row_Structure": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 7,
+      "items": {
+        "type": "string",
+        "enum": [
+          "Theta",
+          "Phi",
+          "MagAttenuationTP",
+          "MagAttenuationCo",
+          "MagAttenuationCr",
+          "PhaseCo",
+          "PhaseCr"
+        ]
+      }
+    },
+    "Data_Set": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 7,
+        "items": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  "required": [
+    "BASTA_AA_WP_version",
+    "Supplier",
+    "Antenna_Model",
+    "Antenna_Type",
+    "Revision_Version",
+    "Released_Date",
+    "Coordinate_System",
+    "Pattern_Name",
+    "Beam_ID",
+    "Pattern_Type",
+    "Frequency",
+    "Frequency_Range",
+    "EIRP",
+    "Configured_Output_Power",
+    "Gain",
+    "Configuration",
+    "RF_Port",
+    "Array_ID",
+    "Array_Position",
+    "Phi_HPBW",
+    "Theta_HPBW",
+    "Front_to_Back",
+    "Phi_Electrical_Pan",
+    "Theta_Electrical_Tilt",
+    "Nominal_Polarization",
+    "Theta_Sampling",
+    "Phi_Sampling",
+    "Data_Set_Row_Structure",
+    "Data_Set"
+  ]
+}
