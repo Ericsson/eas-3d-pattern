@@ -35,7 +35,7 @@ def temporarily_set_loglevel(logger_name: str, level: int) -> Iterator[None]:
 
 
 def generate_report_eas(
-    directory_path: Path | str,
+    input_directory: Path | str,
     output_directory: Path | str,
     plot: bool = False,
     subbands: dict[str, tuple[int, int]] = SUBBANDS_DEFAULT,
@@ -46,7 +46,7 @@ def generate_report_eas(
     Additionally, aggregated data per array and per tilt and per subband is also generated.
 
     Args:
-        directory_path (Path | str): The path to the directory containing the JSON files.
+        input_directory (Path | str): The path to the directory containing the JSON files.
         output_directory (Path | str): The path to the directory where the report will be saved.
         plot (bool, optional): Whether to generate plots of the antenna patterns. Default is False.
         subbands (dict[str, tuple[int, int]], optional): A dictionary of subbands and their corresponding frequency ranges. Default is SUBBANDS_DEFAULT.
@@ -70,8 +70,8 @@ def generate_report_eas(
         ...     "path/to/directory", "path/to/output_directory", subband=my_own_subbands
         ... )  # with own subband
     """
-    directory_path = Path(directory_path)
-    files = list(directory_path.glob("*.json"))
+    input_directory = Path(input_directory)
+    files = list(input_directory.glob("*.json"))
     if len(files) == 0:
         raise ValueError("Report: No .json files found in the directory.")
     output_directory = Path(output_directory)
