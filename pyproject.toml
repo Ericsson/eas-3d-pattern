@@ -13,10 +13,13 @@ keywords = ["antenna", "pattern", "3d pattern", "visualization", "NGMN", "BASTA"
 dependencies = [
     "numpy (>=2.0.0,<3.0.0)",
     "pandas (>=2.2.2,<3.0.0)",
+    "openpyxl (>=3.1.5, <4.0.0)",
     "jsonschema (>=4.24.0,<5.0.0)",
     "xarray (>=2025.3.1,<2026.0.0)",
     "plotly (>=5.24.1,<6.0.0)",
+    "kaleido (>=0.1.0post1,<0.2.0)",
     "requests (>=2.32.2,<3.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
 ]
 
 classifiers = [

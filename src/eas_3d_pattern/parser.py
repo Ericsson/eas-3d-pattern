@@ -485,6 +485,26 @@ class AntennaPattern:
         )
         return Pattern_3D.sortby(["Theta", "Phi"])
 
+    def get_metadata_dict(self) -> dict[str, Any]:
+        """Get meta data dictionary of the antenna pattern data.
+
+        Metadata is everything beside 'Data_Set' and 'Data_Set_Row_Structure' from the JSON file.
+        The metadata can be used to enrich pandas dataframes.
+
+        Args:
+            None
+
+        Returns:
+            dict: A dictionary with key and value pairs from the JSON file.
+
+        Example:
+            >>> meta_dict = antenna_pattern.get_metadata_dict()
+        """
+        metadata = self.raw_data.copy()
+        metadata.pop("Data_Set", None)
+        metadata.pop("Data_Set_Row_Structure", None)
+        return metadata
+
     def calculate_beam_efficiency(
         self, sector_definitions: SectorDefinition | None = None, powersum: bool = True
     ) -> dict[str, float]:
