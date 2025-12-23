@@ -505,6 +505,81 @@ class AntennaPattern:
         metadata.pop("Data_Set_Row_Structure", None)
         return metadata
 
+    def calculate_directivity(self) -> float:
+        """Calculate the directivity of the antenna pattern data.
+
+        Directivity is calculated with the average radiation intensity over the whole sphere and the maximum radiation intensity.
+        Can only be calculated if data is complete (full sphere). Regular grids are advised.
+        Fancy geometry calculation with something like Delaunay+Voronoi is not supported for now.
+
+        Args:
+            None
+
+        Raises:
+            None
+
+        Returns:
+            float: The directivity value in dBi.
+
+        Example:
+            >>> directivity_dbi = antenna_pattern.calculate_directivity()
+            >>> losses = gain_dbi - directivity_dbi
+        """
+        logger.debug("AntennaPattern: Calculating directivity of antenna pattern data.")
+        if "dOmega" not in list(self.Pattern_3D.data_vars.keys()):
+            weight = np.repeat(
+                np.sin(np.deg2rad(self.Pattern_3D.Theta.values)).T[:, None],
+                len(self.Pattern_3D.Phi),
+                axis=1,
+            )
+            dTheta = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Theta"]))).reshape(
+                -1, 1
+            )
+            dPhi = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Phi"]))).reshape(
+                1, -1
+            )
+            factor = dTheta * dPhi
+            dOmega = weight * factor
+            self.Pattern_3D["dOmega"] = xr.DataArray(
+                dOmega,
+                dims=("Theta", "Phi"),
+                coords={"Theta": self.Pattern_3D.Theta, "Phi": self.Pattern_3D.Phi},
+                name="dOmega",
+            )
+        Umax = float(self.Pattern_3D["P_tp_lin"].max())
+        Uavg = float(
+            (self.Pattern_3D["P_tp_lin"] * self.Pattern_3D["dOmega"]).sum(
+                ("Theta", "Phi")
+            )
+            / (self.Pattern_3D["dOmega"].sum())
+        )
+        directivity_dbi = float(10 * np.log10(Umax / Uavg))
+        return directivity_dbi
+
+    def calculate_losses(self) -> float:
+        """Calculate the losses of the antenna pattern data.
+
+        Antenna losses are calculated by the gain value within the header and the calculated directivity.
+
+        Args:
+            None
+
+        Raises:
+            None
+
+        Returns:
+            float: The loss value in dB (gain - directivity).
+
+        Example:
+            >>> losses = antenna_pattern.calculate_losses()
+        """
+        logger.debug("AntennaPattern: Calculating losses of antenna pattern data.")
+        if self.gain_dbi is None:
+            raise ValueError(
+                "AntennaPattern: Loss can only be calculated if 'Gain' is available in the header"
+            )
+        return float(self.gain_dbi - self.calculate_directivity())
+
     def calculate_beam_efficiency(
         self, sector_definitions: SectorDefinition | None = None, powersum: bool = True
     ) -> dict[str, float]:
