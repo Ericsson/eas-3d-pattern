@@ -784,9 +784,9 @@ class AntennaPattern:
     def plot(
         self, component_name: str = "P_tp_dB", show_fig: bool = True
     ) -> None | go.Figure:
-        """Plots the radation pattern as heatmap.
+        """Plots the radiation pattern as heatmap.
 
-        Plots with ploty the radation pattern as heatmap.
+        Plots with plotly the radiation pattern as heatmap.
         Normalized radation pattern are shown in dB.
 
         Args:
@@ -853,6 +853,138 @@ class AntennaPattern:
             margin={"t": 40, "l": 60, "r": 60, "b": 60},
             height=500,
         )
+        if show_fig:
+            fig.show()
+            return None
+        return fig
+
+    def plot_3D(
+        self,
+        component_name: str = "P_tp_dB",
+        db_floor: float = -30.0,
+        show_axes_arrows: bool = True,
+        show_fig: bool = True,
+    ) -> None | go.Figure:
+        """Plots the radiation pattern as 3D polar plot.
+
+        Plots with plotly the radiation pattern as 3D polar plot.
+        dB_floor is set to -30 as average baseline.
+
+        Args:
+            component_name (str, optional): Name of the component to be plotted. Defaults to 'P_tp_dB', thus power pattern.
+            db_floor (float, optional): Sets a minimum floor to have smoother plots. Defaults to -30.
+            show_axes_arrows (bool, optional): Shows coordinate axes arrows in the plot. Defaults to True.
+            show_fig (bool, optional): Whether to show the figure. Defaults to True.
+
+        Returns:
+            None | go.Figure: None if show_fig is False else go.Figure
+
+        """
+        if component_name not in self.Pattern_3D.data_vars:
+            logger.error(
+                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
+            )
+            raise ValueError(
+                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
+            )
+
+        theta_rad = np.radians(self.Pattern_3D.coords["Theta"].values)
+        phi_rad = np.radians(self.Pattern_3D.coords["Phi"].values)
+        theta_grid, phi_grid = np.meshgrid(theta_rad, phi_rad, indexing="ij")
+        r = self.Pattern_3D[component_name].values
+        r_clipped = np.clip(r, db_floor, r.max())
+        r_clipped -= r_clipped.min()
+        X = r_clipped * np.sin(theta_grid) * np.cos(phi_grid)
+        Y = r_clipped * np.sin(theta_grid) * np.sin(phi_grid)
+        Z = r_clipped * np.cos(theta_grid)
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Surface(
+                x=X,
+                y=Y,
+                z=Z,
+                surfacecolor=r,
+                colorscale="turbo",
+                cmin=db_floor,
+                cmax=0,
+                colorbar={"title": component_name, "thickness": 9},
+            )
+        )
+        fig.update_layout(
+            title={
+                "text": os.path.basename(self.data_filepath),
+                "x": 0.5,
+                "y": 0.93,
+                "yanchor": "bottom",
+                "font": {"size": 16},
+            },
+            height=650,
+            margin={"t": 50, "l": 0, "r": 0, "b": 0},
+            scene={
+                "aspectmode": "data",
+                "xaxis_title": "x",
+                "yaxis_title": "y",
+                "zaxis_title": "z",
+            },
+        )
+        if show_axes_arrows:
+            L = r_clipped.max() + 6
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[0, L],
+                    y=[0, 0],
+                    z=[0, 0],
+                    mode="lines",
+                    line={"color": "black", "width": 6},
+                    showlegend=False,
+                    hoverinfo="skip",
+                    hovertemplate=None,
+                )
+            )
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[0, 0],
+                    y=[0, L / 2],
+                    z=[0, 0],
+                    mode="lines",
+                    line={"color": "black", "width": 6},
+                    showlegend=False,
+                    hoverinfo="skip",
+                    hovertemplate=None,
+                )
+            )
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[0, 0],
+                    y=[0, 0],
+                    z=[0, L / 2],
+                    mode="lines",
+                    line={"color": "black", "width": 6},
+                    showlegend=False,
+                    hoverinfo="skip",
+                    hovertemplate=None,
+                )
+            )
+            fig.add_trace(
+                go.Cone(
+                    x=[L, 0, 0],
+                    y=[0, L / 2, 0],
+                    z=[0, 0, L / 2],
+                    u=[4, 0, 0],
+                    v=[0, 4, 0],
+                    w=[0, 0, 4],
+                    anchor="tail",
+                    showscale=False,
+                    autocolorscale=False,
+                    sizemode="absolute",
+                    sizeref=0.3,
+                    colorscale=[[0, "black"], [1, "black"]],
+                    showlegend=False,
+                    hoverinfo="skip",
+                    hovertemplate=None,
+                )
+            )
         if show_fig:
             fig.show()
             return None
