@@ -115,6 +115,42 @@ def _process_a_file(
         data = pattern.get_metadata_dict()
         top_border = pattern.calculate_top_3db_point(power=False)
         eas_sectors = SectorDefinition(load_default=True, top_border=top_border)
+        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] < -20):
+            logging.info(
+                "Reporting: Identified dual beam antenna. Overwriting sectors to dual beam definition for reporting."
+            )
+            eas_sectors.add_sector(
+                name="Cell",
+                theta_min=(top_border, "<="),
+                theta_max=(165, "<="),
+                phi_min=(-60.0, "<="),
+                phi_max=(0, "<="),
+            )
+            eas_sectors.add_sector(
+                name="Int2",
+                theta_min=(top_border, "<="),
+                theta_max=(165, "<="),
+                phi_min=(0.0, "<"),
+                phi_max=(180.0, "<="),
+            )
+        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] > 20):
+            logging.info(
+                "Reporting: Identified dual beam antenna. Changing sectors to dual beam definition for reporting."
+            )
+            eas_sectors.add_sector(
+                name="Cell",
+                theta_min=(top_border, "<="),
+                theta_max=(165, "<="),
+                phi_min=(0.0, "<="),
+                phi_max=(60.0, "<="),
+            )
+            eas_sectors.add_sector(
+                name="Int1",
+                theta_min=(top_border, "<="),
+                theta_max=(165, "<="),
+                phi_min=(-180.0, "<="),
+                phi_max=(0.0, "<"),
+            )
         eff = pattern.calculate_beam_efficiency(sector_definitions=eas_sectors)
         data.update({f"{k}": v * 100 for k, v in eff.items()})
         data.update(
