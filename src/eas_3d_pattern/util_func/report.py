@@ -71,7 +71,7 @@ def generate_report_eas(
         ... )  # with own subband
     """
     input_directory = Path(input_directory)
-    files = list(input_directory.glob("*.json"))
+    files = list(input_directory.glob("*.[jJ][sS][oO][nN]"))
     if len(files) == 0:
         raise ValueError("Report: No .json files found in the directory.")
     output_directory = Path(output_directory)
