@@ -3,7 +3,7 @@ name = "eas-3d-pattern"
 dynamic = ["version"]
 description = "A tool to visualize 3D antenna pattern files in JSON format."
 authors = [
-    {name = "Georg Polownikow",email = "georg.polownikow@ericsson.com"}
+    {name = "Georg Polownikow",email = "georg.polownikow@gmail.com"}
 ]
 license = {file = "LICENSE"}
 readme = "README.md"
@@ -20,6 +20,7 @@ dependencies = [
     "kaleido (>=0.1.0, <0.2.0)",
     "requests (>=2.32.2,<3.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
+    "nbformat (>=4.2.0,<6.0.0)",
 ]
 
 classifiers = [
