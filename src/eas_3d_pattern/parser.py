@@ -782,7 +782,7 @@ class AntennaPattern:
         return top_border
 
     def plot(
-        self, component_name: str = "P_tp_dB", show_fig: bool = True
+        self, component_name: str = "P_tp_dB", show_fig: bool = True, remove_layout_components: bool = False
     ) -> None | go.Figure:
         """Plots the radiation pattern as heatmap.
 
@@ -792,6 +792,8 @@ class AntennaPattern:
         Args:
             component_name (str, optional): Name of the component to be plotted. Defaults to 'P_tp_dB', thus power pattern.
             show_fig (bool, optional): Whether to show the figure. Defaults to True.
+            remove_layout_components (bool, optional): Whether to remove text, color bar and tick labels from plots of the antenna patterns. Default is False.
+
 
         Returns:
             None | go.Figure: None if show_fig is False else go.Figure
@@ -823,36 +825,43 @@ class AntennaPattern:
             )
         )
         fig.update_yaxes(autorange="reversed")
-        fig.update_layout(
-            title={
-                "text": os.path.basename(self.data_filepath),
-                "x": 0.5,
-                "y": 0.93,
-                "yanchor": "bottom",
-                "font": {"size": 16},
-            },
-            xaxis={
-                "title": "φ [°]",
-                "tickmode": "linear",
-                "title_standoff": 10,
-                "dtick": 30,
-                "showgrid": True,
-                "tickangle": -45,
-                "gridcolor": "rgba(0,0,0,0.2)",
-                "zeroline": False,
-            },
-            yaxis={
-                "title": "θ [°]",
-                "tickmode": "linear",
-                "title_standoff": 10,
-                "dtick": 30,
-                "showgrid": True,
-                "gridcolor": "rgba(0,0,0,0.2)",
-                "zeroline": False,
-            },
-            margin={"t": 40, "l": 60, "r": 60, "b": 60},
-            height=500,
-        )
+        if remove_layout_components:
+            fig.update_layout(
+                xaxis={"showticklabels": False},
+                yaxis={"showticklabels": False},
+            )
+        else:
+            fig.update_layout(
+                title={
+                    "text": os.path.basename(self.data_filepath),
+                    "x": 0.5,
+                    "y": 0.93,
+                    "yanchor": "bottom",
+                    "font": {"size": 16},
+                },
+                xaxis={
+                    "title": "φ [°]",
+                    "tickmode": "linear",
+                    "title_standoff": 10,
+                    "dtick": 30,
+                    "showgrid": True,
+                    "tickangle": -45,
+                    "gridcolor": "rgba(0,0,0,0.2)",
+                    "zeroline": False,
+                },
+                yaxis={
+                    "title": "θ [°]",
+                    "tickmode": "linear",
+                    "title_standoff": 10,
+                    "dtick": 30,
+                    "showgrid": True,
+                    "gridcolor": "rgba(0,0,0,0.2)",
+                    "zeroline": False,
+                },
+                margin={"t": 40, "l": 60, "r": 60, "b": 60},
+                height=500,
+            )
+
         if show_fig:
             fig.show()
             return None
