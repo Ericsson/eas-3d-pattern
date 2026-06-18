@@ -822,6 +822,7 @@ class AntennaPattern:
                     "val = %{z:.2f}<br>"
                     "<extra></extra>"
                 ),
+                showscale=not(remove_layout_components),
             )
         )
         fig.update_yaxes(autorange="reversed")
