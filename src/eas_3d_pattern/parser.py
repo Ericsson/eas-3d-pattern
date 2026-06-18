@@ -828,8 +828,22 @@ class AntennaPattern:
         fig.update_yaxes(autorange="reversed")
         if remove_layout_components:
             fig.update_layout(
-                xaxis={"showticklabels": False},
-                yaxis={"showticklabels": False},
+                xaxis={
+                    "showticklabels": False,
+                    "showgrid": False,
+                    "zeroline": False,
+                    "showline": False,
+                },
+                yaxis={
+                    "showticklabels": False,
+                    "showgrid": False,
+                    "zeroline": False,
+                    "showline": False,
+                },
+                plot_bgcolor="rgba(0,0,0,0)",   # sin fondo gris en el área del heatmap
+                paper_bgcolor="rgba(0,0,0,0)",  # sin fondo/gris alrededor
+                margin={"t": 0, "l": 0, "r": 0, "b": 0},  # recorta al mínimo
+                height=500,
             )
         else:
             fig.update_layout(
