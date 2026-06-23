@@ -5,6 +5,9 @@ description = "A tool to visualize 3D antenna pattern files in JSON format."
 authors = [
     {name = "Georg Polownikow",email = "georg.polownikow@gmail.com"}
 ]
+maintainers = [
+    {name = "Mattia Milani", email = "mattia.milani@ericsson.com"}
+]
 license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -17,7 +20,7 @@ dependencies = [
     "jsonschema (>=4.24.0,<5.0.0)",
     "xarray (>=2025.3.1,<2026.0.0)",
     "plotly (>=5.24.1,<6.0.0)",
-    "kaleido (>=0.1.0, <0.2.0)",
+    "kaleido (==0.2.0)",
     "requests (>=2.32.2,<3.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
     "nbformat (>=4.2.0,<6.0.0)",
@@ -39,6 +42,7 @@ classifiers = [
 [project.urls]
 homepage = "https://www.ericsson.com/antenna-system"
 repository = "https://github.com/Ericsson/eas-3d-pattern"
+"Bug Tracker" = "https://github.com/Ericsson/eas-3d-pattern/issues"
 
 [tool.poetry]
 packages = [{include = "eas_3d_pattern", from = "src"}]
