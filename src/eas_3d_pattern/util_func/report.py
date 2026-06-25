@@ -188,6 +188,7 @@ def _save_figure(
         sector_definitions (SectorDefinition): The SectorDefinition to use for plotting.
         output_directory (Path): The directory to save the plot to.
         remove_layout_components (bool, optional): Whether to remove text, color bar and tick labels from plots of the antenna patterns. Default is False.
+
     Returns:
         None
     """

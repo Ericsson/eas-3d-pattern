@@ -59,10 +59,13 @@ nbformat = "^5.10.4"
 ruff = "^0.11.12"
 mypy = "^1.16.0"
 pre-commit = "^4.2.0"
+
+[tool.poetry.group.typing.dependencies]
 pandas-stubs = "2.2.2.240909"
 plotly-stubs = "^0.0.5"
 types-requests = "^2.32.4.20250611"
 types-jsonschema = "^4.24.0.20250528"
+types-tqdm = "^4.67.0.20250516"
 
 [tool.poetry.requires-plugins]
 poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
@@ -152,7 +155,7 @@ docstring-code-format = true
 
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 check_untyped_defs = true
