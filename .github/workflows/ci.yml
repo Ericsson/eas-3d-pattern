@@ -18,12 +18,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install ruff mypy
-          pip install types-requests types-jsonschema pandas-stubs plotly-stubs
+          pip install poetry poetry-dynamic-versioning
+          poetry install --only main,dev,typing
       - name: Ruff
-        run: ruff check src/
+        run: poetry run ruff check src/
       - name: Mypy
-        run: mypy src/
+        run: poetry run mypy src/
 
   build:
     name: Build (Python ${{ matrix.python-version }})
