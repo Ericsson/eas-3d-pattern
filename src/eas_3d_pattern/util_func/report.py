@@ -38,6 +38,7 @@ def generate_report_eas(
     input_directory: Path | str,
     output_directory: Path | str,
     plot: bool = False,
+    remove_layout_components: bool = False,
     subbands: dict[str, tuple[int, int]] = SUBBANDS_DEFAULT,
 ) -> pd.DataFrame:
     """Generates a excel report for EAS JSON files.
@@ -49,6 +50,7 @@ def generate_report_eas(
         input_directory (Path | str): The path to the directory containing the JSON files.
         output_directory (Path | str): The path to the directory where the report will be saved.
         plot (bool, optional): Whether to generate plots of the antenna patterns. Default is False.
+        remove_layout_components (bool, optional): Whether to remove text, color bar and tick labels from plots of the antenna patterns. Default is False.
         subbands (dict[str, tuple[int, int]], optional): A dictionary of subbands and their corresponding frequency ranges. Default is SUBBANDS_DEFAULT.
 
     Returns:
@@ -85,7 +87,7 @@ def generate_report_eas(
                 data_row, pattern, sectors = data
                 df_list.append(data_row)
                 if plot:
-                    _save_figure(pattern, sectors, output_directory)
+                    _save_figure(pattern, sectors, output_directory, remove_layout_components)
         df_raw = pd.concat(df_list, ignore_index=True)
 
     report_name = output_directory / "BEreport.xlsx"
@@ -177,6 +179,7 @@ def _save_figure(
     pattern: AntennaPattern,
     sector_definitions: SectorDefinition,
     output_directory: Path,
+    remove_layout_components: bool = False,
 ) -> None:
     """Saves the plot of the given AntennaPattern and SectorDefinition to a PNG file.
 
@@ -184,11 +187,11 @@ def _save_figure(
         pattern (AntennaPattern): The AntennaPattern to plot.
         sector_definitions (SectorDefinition): The SectorDefinition to use for plotting.
         output_directory (Path): The directory to save the plot to.
-
+        remove_layout_components (bool, optional): Whether to remove text, color bar and tick labels from plots of the antenna patterns. Default is False.
     Returns:
         None
     """
-    fig = pattern.plot(show_fig=False)
+    fig = pattern.plot(show_fig=False,remove_layout_components=remove_layout_components)
     if fig is None:
         return
     for k in sector_definitions.sectors:
