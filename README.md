@@ -3,7 +3,8 @@
 [![PyPI version](https://img.shields.io/pypi/v/eas-3d-pattern.svg)](https://pypi.org/project/eas-3d-pattern/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eas-3d-pattern.svg)](https://pypi.org/project/eas-3d-pattern/)
 [![PyPI - License](https://img.shields.io/pypi/l/eas-3d-pattern.svg)](https://github.com/Ericsson/eas-3d-pattern/blob/main/LICENSE)
-[![Linter: Ruff](https://img.shields.io/badge/Linter-Ruff-blue.svg)](https://github.com/astral-sh/ruff)
+[![CI](https://github.com/Ericsson/eas-3d-pattern/actions/workflows/ci.yml/badge.svg)](https://github.com/Ericsson/eas-3d-pattern/actions/workflows/ci.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 eas-3d-pattern is python library to **visualize** and make simple **beam efficiency calculations** on **3D antenna pattern data** which follows the NGMN BASTA schema.
 
