@@ -32,6 +32,15 @@ DEFAULT_INTERNAL_COORD_SYSTEM = "SPCS_Ericsson"
 
 epsilon = 1e-6
 
+# Maps vendor-specific variant -> canonical key
+ALTERNATIVES: dict[str, str] = {
+    # "Theta_Tilt" comes from the NGMN whitepaper:
+    # https://www.ngmn.org/wp-content/uploads/NGMN_BASTA_Recommendations-for-Base-Station-Antennas_V13.0.pdf
+    # "Theta_Electrical_Tilt" comes from the latest JSON Schema:
+    # https://www.ngmn.org/schema/basta/NGMN_BASTA_AA_3drp_JSON_Schema_WP3_0_latest.json
+    "Theta_Tilt": "Theta_Electrical_Tilt",
+}
+
 
 class AntennaPattern:
     """Antenna pattern class to read, calculate and visualize JSON antenna pattern data.
@@ -66,7 +75,9 @@ class AntennaPattern:
             raise FileNotFoundError(f"Data file not found: {data_filepath}")
         self.data_filepath: str = data_filepath
         self._schema: dict[str, Any] | None = NGMNSchema.schema_content
-        self.raw_data: dict[str, Any] = self._load_data_from_file(data_filepath)
+        self.raw_data: dict[str, Any] = self._normalize_json(
+            self._load_data_from_file(data_filepath)
+        )
         if validate and self._schema is not None:
             self._validate_data_against_schema(self.raw_data, self._schema)
 
@@ -84,6 +95,39 @@ class AntennaPattern:
         except OSError as e:
             logger.error(f"Could not read user data file {filepath}: {e}")
             raise OSError(f"Could not read user data file {filepath}: {e}") from e
+
+    def _normalize_json(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Normalize vendor-specific keys to canonical names.
+
+        Some vendors use non-standard key names in their 3drp JSON files.
+        This method replaces known variants with the canonical key defined
+        in the latest NGMN BASTA JSON schema, using the module-level
+        ALTERNATIVES mapping.
+
+        The canonical key is only set if it is not already present in the data,
+        preventing accidental overwrites when both keys coexist.
+
+        Example:
+            A file using the `NGMN whitepaper
+            <https://www.ngmn.org/wp-content/uploads/NGMN_BASTA_Recommendations-for-Base-Station-Antennas_V13.0.pdf>`_ naming::
+
+                {"Theta_Tilt": 6.0, ...}
+
+            Is normalized to the current `JSON schema
+            <https://www.ngmn.org/schema/basta/NGMN_BASTA_AA_3drp_JSON_Schema_WP3_0_latest.json>`_ naming::
+
+                {"Theta_Electrical_Tilt": 6.0, ...}
+
+        Args:
+            data: Raw dictionary loaded from a JSON antenna pattern file.
+
+        Returns:
+            The same dictionary with variant keys replaced by their canonical equivalents.
+        """
+        for variant, canonical in ALTERNATIVES.items():
+            if variant in data and canonical not in data:
+                data[canonical] = data.pop(variant)
+        return data
 
     def _validate_data_against_schema(
         self, data_instance: dict[str, Any], schema_instance: dict[str, Any]
