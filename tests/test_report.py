@@ -86,3 +86,40 @@ def test_generate_excel_report_handles_no_matching_subband(tmp_path):
     report_name = tmp_path / "BEreport.xlsx"
     report_mod._generate_excel_report(df, report_name, report_mod.SUBBANDS_DEFAULT)
     assert report_name.is_file()
+
+
+def test_generate_report_surfaces_skipped_files(tmp_path, make_pattern_dict, caplog):
+    """Bug 48: files that fail processing must be surfaced, not silently dropped.
+
+    One valid pattern and one invalid file are placed in the input directory.
+    The report must be generated from the valid file while logging a warning
+    that reports the number of skipped files.
+    """
+    import json
+    import logging
+
+    input_dir = tmp_path / "in"
+    input_dir.mkdir()
+    output_dir = tmp_path / "out"
+
+    good = make_pattern_dict(
+        coordinate_system="SPCS_Ericsson",
+        peak_theta=90.0,
+        peak_phi=0.0,
+        extra={
+            "Supplier": "S",
+            "Antenna_Model": "M",
+            "Revision_Version": "R",
+            "Array_ID": "A",
+            "Theta_Electrical_Tilt": 0.0,
+            "Frequency": {"value": 2100.0, "unit": "MHz"},
+        },
+    )
+    (input_dir / "good.json").write_text(json.dumps(good), encoding="utf-8")
+    (input_dir / "bad.json").write_text("{}", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="eas_3d_pattern.util_func.report"):
+        df = report_mod.generate_report_eas(input_dir, output_dir)
+
+    assert len(df) == 1
+    assert "skipped" in caplog.text.lower()

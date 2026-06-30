@@ -83,6 +83,7 @@ def generate_report_eas(
     output_directory.mkdir(parents=True, exist_ok=True)
 
     df_list: list[pd.DataFrame] = []
+    skipped_files: list[str] = []
     with temporarily_set_loglevel(logger_name="eas_3d_pattern", level=logging.ERROR):
         for file in tqdm(files):
             data = _process_a_file(file)
@@ -93,7 +94,22 @@ def generate_report_eas(
                     _save_figure(
                         pattern, sectors, output_directory, remove_layout_components
                     )
-        df_raw = pd.concat(df_list, ignore_index=True)
+            else:
+                skipped_files.append(file.name)
+
+    if skipped_files:
+        logger.warning(
+            f"Report: skipped {len(skipped_files)} of {len(files)} file(s) due to "
+            f"processing errors: {skipped_files}"
+        )
+    if not df_list:
+        logger.error(
+            f"Report: all {len(files)} file(s) were skipped due to errors; no report generated."
+        )
+        raise ValueError(
+            f"Report: all {len(files)} file(s) were skipped due to errors; no report generated."
+        )
+    df_raw = pd.concat(df_list, ignore_index=True)
 
     report_name = output_directory / "BEreport.xlsx"
     _generate_excel_report(df_raw, report_name, subbands)

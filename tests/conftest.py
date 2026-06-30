@@ -84,6 +84,12 @@ def build_pattern_dict(
 
 
 @pytest.fixture
+def make_pattern_dict():
+    """Return the synthetic pattern-dict builder for tests that write their own files."""
+    return build_pattern_dict
+
+
+@pytest.fixture
 def pattern_path(tmp_path: Path) -> Callable[..., str]:
     """Return a factory that writes a synthetic pattern JSON and returns its path."""
     counter = {"n": 0}
