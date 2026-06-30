@@ -87,3 +87,16 @@ def test_empty_data_set_raises_clear_error(pattern_path):
     )
     with pytest.raises(ValueError, match="(?i)data_set"):
         AntennaPattern(path, validate=False)
+
+
+def test_top_3db_point_uses_grid_step_not_hardcoded_one(pattern_path):
+    """Bug 43: the 3 dB border must advance by the grid step, not a fixed +1.
+
+    On a 5 deg grid with the beam peaking at theta=90, the -3 dB crossing falls
+    on theta=80 (atten 5 dB), so the top border should be 80 + 5 = 85, not the
+    hardcoded 80 + 1 = 81.
+    """
+    path = pattern_path(peak_theta=90.0, peak_phi=0.0)  # default 5 deg grid
+    pattern = AntennaPattern(path, validate=False)
+    top = pattern.calculate_top_3db_point(power=False)
+    assert top == 85.0

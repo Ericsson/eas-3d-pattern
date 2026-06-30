@@ -852,11 +852,18 @@ class AntennaPattern:
         # narrow beam peaking at the top of the cut), the 3 dB border collapses to
         # the peak theta itself instead of leaving ``top_border`` unbound.
         top_border = float(theta_val_peak)
+        # Advance the border by the actual theta grid step rather than a hardcoded
+        # 1 deg, so the result is correct for any sampling resolution.
+        theta_axis = np.sort(vertical_cut_normed["Theta"].values)
+        if theta_axis.size > 1:
+            grid_step = float(np.median(np.diff(theta_axis)))
+        else:
+            grid_step = 1.0
         for theta_val in np.flip(
             vertical_cut_normed.sel(Theta=slice(0, theta_val_peak))["Theta"]
         ):
             if vertical_cut_normed.sel(Theta=theta_val) <= -3:
-                top_border = float((theta_val + 1).values)
+                top_border = float(theta_val.values) + grid_step
                 break
         else:
             logger.warning(
