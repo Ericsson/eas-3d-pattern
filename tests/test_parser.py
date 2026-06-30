@@ -114,3 +114,32 @@ def test_validate_true_without_schema_raises(pattern_path, monkeypatch):
     path = pattern_path()
     with pytest.raises(ValueError, match="(?i)schema"):
         AntennaPattern(path, validate=True)
+
+
+def test_str_shows_zero_values_not_na(pattern_path):
+    """Bug 49: a legitimate 0.0 value must render as 0.0, not 'N/A'.
+
+    ``__str__`` used truthiness checks (``x if x else 'N/A'``), so a real 0.0
+    HPBW or front-to-back ratio was displayed as 'N/A'. Must use ``is not None``.
+    """
+    path = pattern_path(
+        extra={
+            "Supplier": "S",
+            "Antenna_Model": "M",
+            "Antenna_Type": "T",
+            "Revision_Version": "R",
+            "Released_Date": "2020",
+            "Pattern_Type": "P",
+            "Nominal_Polarization": "NP",
+            "Optional_Comments": "none",
+            "Phi_HPBW": 0.0,
+            "Theta_HPBW": 0.0,
+            "Front_to_Back": 0.0,
+            "Frequency": {"value": 2100.0, "unit": "MHz"},
+        }
+    )
+    pattern = AntennaPattern(path, validate=False)
+    text = str(pattern)
+    assert "Phi HPBW [deg]: 0.0" in text
+    assert "Theta HPBW [deg]: 0.0" in text
+    assert "Front to Back [db]: 0.0" in text
