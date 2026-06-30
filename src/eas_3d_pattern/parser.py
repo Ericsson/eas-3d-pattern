@@ -168,12 +168,7 @@ class AntennaPattern:
             error_path_str = (
                 " -> ".join(map(str, e.path)) if e.path else "document root"
             )
-            full_error_message = (
-                f"Antenna data validation FAILED for '{self.data_filepath}'.\n"
-                f"Schema source: '{NGMNSchema.source_message}'.\n"
-                f"Error at data path: '{error_path_str}'.\n"
-                f"Validation Message: {e.message} (Validator: '{e.validator}')"
-            )
+            full_error_message = f"Antenna data validation FAILED for '{self.data_filepath}'.\nSchema source: '{NGMNSchema.source_message}'.\nError at data path: '{error_path_str}'.\nValidation Message: {e.message} (Validator: '{e.validator}')"
             logger.error(full_error_message)
             raise ValidationError(full_error_message) from e
 
@@ -543,26 +538,18 @@ class AntennaPattern:
         new_theta = Pattern_3D.coords["Theta"].values
         if new_theta.min() < 0 or new_theta.max() > 180:
             logger.error(
-                f"AntennaPattern: Transformed theta out of range [0, 180] "
-                f"([{new_theta.min()}, {new_theta.max()}]) converting from "
-                f"'{from_system}'. Input data is likely out of spec for that system."
+                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
             )
             raise ValueError(
-                f"AntennaPattern: Transformed theta out of range [0, 180] "
-                f"([{new_theta.min()}, {new_theta.max()}]) converting from "
-                f"'{from_system}'. Input data is likely out of spec for that system."
+                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
             )
         new_phi = Pattern_3D.coords["Phi"].values
         if new_phi.min() < -180 or new_phi.max() > 179:
             logger.error(
-                f"AntennaPattern: Transformed phi out of range [-180, 179] "
-                f"([{new_phi.min()}, {new_phi.max()}]) converting from "
-                f"'{from_system}'. Input data is likely out of spec for that system."
+                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
             )
             raise ValueError(
-                f"AntennaPattern: Transformed phi out of range [-180, 179] "
-                f"([{new_phi.min()}, {new_phi.max()}]) converting from "
-                f"'{from_system}'. Input data is likely out of spec for that system."
+                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
             )
         Pattern_3D = Pattern_3D.assign_attrs(
             coordinate_system=to_system,
@@ -925,12 +912,7 @@ class AntennaPattern:
                 zmin=-30,
                 zmax=0,
                 colorbar={"title": component_name, "thickness": 9},
-                hovertemplate=(
-                    "φ = %{x:.0f}°<br>"
-                    "θ = %{y:.0f}°<br>"
-                    "val = %{z:.2f}<br>"
-                    "<extra></extra>"
-                ),
+                hovertemplate="φ = %{x:.0f}°<br>θ = %{y:.0f}°<br>val = %{z:.2f}<br><extra></extra>",
                 showscale=not (remove_layout_components),
             )
         )
@@ -1158,7 +1140,4 @@ class AntennaPattern:
         return "\n".join(lines)
 
     def __repr__(self) -> str:
-        return (
-            f"<AntennaPattern(data_filepath='{self.data_filepath}', "
-            f"model='{self.antenna_model}', supplier='{self.supplier}')>"
-        )
+        return f"<AntennaPattern(data_filepath='{self.data_filepath}', model='{self.antenna_model}', supplier='{self.supplier}')>"

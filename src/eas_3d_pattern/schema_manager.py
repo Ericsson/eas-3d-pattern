@@ -207,11 +207,7 @@ class SchemaManager:
             ) from e
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__}(id=0x{id(self):x}, "
-            f"schema_loaded={'True' if self.schema_content else 'False'}, "
-            f"source={self.source_message})>"
-        )
+        return f"<{self.__class__.__name__}(id=0x{id(self):x}, schema_loaded={'True' if self.schema_content else 'False'}, source={self.source_message})>"
 
     def __str__(self) -> str:
         return str(self.schema_content)

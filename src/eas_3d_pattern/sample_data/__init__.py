@@ -20,13 +20,11 @@ try:
                     SAMPLE_JSON.append(resolved_path)
                 else:
                     logger.warning(
-                        f"Path for sample '{resource.name}' in '{__package__}' "
-                        f" ('{resolved_path}') was not a file after context. Skipping."
+                        f"Path for sample '{resource.name}' in '{__package__}'  ('{resolved_path}') was not a file after context. Skipping."
                     )
             except FileNotFoundError:
                 logger.warning(
-                    f"Sample file '{resource.name}' listed but not found by "
-                    f"importlib.resources in '{__package__}'. Skipping."
+                    f"Sample file '{resource.name}' listed but not found by importlib.resources in '{__package__}'. Skipping."
                 )
             except Exception as e_path:
                 logger.error(
@@ -39,9 +37,7 @@ try:
         )
     else:
         logger.debug(
-            f"No .json sample files found or resolved in '{__package__}'. "
-            "Ensure files exist, have .json extension, and 'include' "
-            "in pyproject.toml is correct for 'sample_data/*.json'."
+            f"No .json sample files found or resolved in '{__package__}'. Ensure files exist, have .json extension, and 'include' in pyproject.toml is correct for 'sample_data/*.json'."
         )
 
 except ModuleNotFoundError:

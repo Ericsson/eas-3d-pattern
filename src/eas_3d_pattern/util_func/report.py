@@ -99,8 +99,7 @@ def generate_report_eas(
 
     if skipped_files:
         logger.warning(
-            f"Report: skipped {len(skipped_files)} of {len(files)} file(s) due to "
-            f"processing errors: {skipped_files}"
+            f"Report: skipped {len(skipped_files)} of {len(files)} file(s) due to processing errors: {skipped_files}"
         )
     if not df_list:
         logger.error(
@@ -289,8 +288,7 @@ def _generate_excel_report(
         df_per_arrayandsubband_per_tilt = pd.concat(avg_df_list, ignore_index=True)
     else:
         logger.warning(
-            "Report: No antenna frequency fell within any configured subband; "
-            "the per-subband sheet will be empty."
+            "Report: No antenna frequency fell within any configured subband; the per-subband sheet will be empty."
         )
         df_per_arrayandsubband_per_tilt = pd.DataFrame()
 
