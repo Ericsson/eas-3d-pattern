@@ -708,6 +708,13 @@ class AntennaPattern:
 
         weighted_field_values = self.Pattern_3D["dOmega"] * field_values
         Sp_overall = float(weighted_field_values.sum())
+        if Sp_overall == 0:
+            logger.error(
+                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
+            )
+            raise ValueError(
+                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
+            )
 
         operators_dict = {
             "<": operator.lt,
