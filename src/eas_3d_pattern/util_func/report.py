@@ -9,6 +9,8 @@ from tqdm import tqdm
 from ..parser import AntennaPattern
 from ..sector_definitions import SectorDefinition
 
+logger = logging.getLogger(__name__)
+
 SUBBANDS_DEFAULT = {
     "698-806": (698, 806),
     "791-862": (791, 862),
@@ -121,7 +123,7 @@ def _process_a_file(
         top_border = pattern.calculate_top_3db_point(power=False)
         eas_sectors = SectorDefinition(load_default=True, top_border=top_border)
         if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] < -20):
-            logging.info(
+            logger.info(
                 "Reporting: Identified dual beam antenna. Overwriting sectors to dual beam definition for reporting."
             )
             eas_sectors.add_sector(
@@ -139,7 +141,7 @@ def _process_a_file(
                 phi_max=(180.0, "<="),
             )
         if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] > 20):
-            logging.info(
+            logger.info(
                 "Reporting: Identified dual beam antenna. Changing sectors to dual beam definition for reporting."
             )
             eas_sectors.add_sector(
@@ -172,7 +174,7 @@ def _process_a_file(
         data["filepath"] = str(pattern.data_filepath)
         return (pd.json_normalize(data, sep="_"), pattern, eas_sectors)
     except Exception as e:
-        logging.error(
+        logger.error(
             f"Reporting: Skipping corrupted or invalid file '{file_path.name}': {e}"
         )
         return None
@@ -278,5 +280,5 @@ def _generate_excel_report(
         df_per_arrayandsubband_per_tilt.to_excel(
             writer, index=False, sheet_name="Mean_ArrayID_Subband_Tilt"
         )
-    logging.info("Report: ✨Generated EAS BE report in %s✨", report_name)
+    logger.info("Report: ✨Generated EAS BE report in %s✨", report_name)
     return None
