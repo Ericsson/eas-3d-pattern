@@ -551,6 +551,18 @@ class AntennaPattern:
                 f"([{new_theta.min()}, {new_theta.max()}]) converting from "
                 f"'{from_system}'. Input data is likely out of spec for that system."
             )
+        new_phi = Pattern_3D.coords["Phi"].values
+        if new_phi.min() < -180 or new_phi.max() > 179:
+            logger.error(
+                f"AntennaPattern: Transformed phi out of range [-180, 179] "
+                f"([{new_phi.min()}, {new_phi.max()}]) converting from "
+                f"'{from_system}'. Input data is likely out of spec for that system."
+            )
+            raise ValueError(
+                f"AntennaPattern: Transformed phi out of range [-180, 179] "
+                f"([{new_phi.min()}, {new_phi.max()}]) converting from "
+                f"'{from_system}'. Input data is likely out of spec for that system."
+            )
         Pattern_3D = Pattern_3D.assign_attrs(
             coordinate_system=to_system,
         )

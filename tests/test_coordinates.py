@@ -87,3 +87,22 @@ def test_phi_boundary_consistent_across_transforms(
     assert phi.max() <= 179.0
     assert not np.any(np.isclose(phi, 180.0))
     assert np.any(np.isclose(phi, -180.0))
+
+
+def test_transformed_phi_out_of_range_is_rejected(pattern_path):
+    """Bug 44: the post-condition must also reject phi outside [-180, 179].
+
+    A CW pattern with valid theta ([-90, 85] -> [0, 175]) but phi already in the
+    internal range [-180, 175] gets negated by the CW transform to [-175, 180],
+    pushing the phi=-180 column to +180 (out of the internal range). The
+    post-condition must catch this instead of silently keeping +180.
+    """
+    path = pattern_path(
+        coordinate_system="SPCS_CW",
+        theta_sampling=[-90.0, 5.0, 85.0],
+        phi_sampling=[-180.0, 5.0, 175.0],
+        peak_theta=0.0,
+        peak_phi=0.0,
+    )
+    with pytest.raises(ValueError, match="(?i)phi"):
+        AntennaPattern(path, validate=False)
