@@ -10,6 +10,7 @@ calculations.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from eas_3d_pattern import AntennaPattern
@@ -51,3 +52,38 @@ def test_valid_cw_pattern_constructs_with_internal_ranges(pattern_path):
     theta = pattern.Pattern_3D.coords["Theta"].values
     assert theta.min() >= 0.0
     assert theta.max() <= 180.0
+
+
+@pytest.mark.parametrize(
+    ("system", "theta_sampling"),
+    [
+        ("SPCS_Polar", [0.0, 5.0, 180.0]),
+        ("SPCS_CW", [-90.0, 5.0, 90.0]),
+        ("SPCS_CCW", [-90.0, 5.0, 90.0]),
+        ("SPCS_Geo", [0.0, 5.0, 180.0]),
+    ],
+)
+def test_phi_boundary_consistent_across_transforms(
+    pattern_path, system, theta_sampling
+):
+    """Bug 42: the phi=180 column maps consistently to -180 in every system.
+
+    The ``phi >= 180`` (Polar/CCW) vs ``phi > 180`` (CW/Geo) difference is not a
+    bug: CW/Geo negate the wrapped value, so ``>`` is the correct compensation.
+    For spec-valid input all four systems map the phi=180 input column to -180
+    and keep phi within the internal [-180, 179] range (no +180, no dropped
+    column). This regression test pins that correct behavior.
+    """
+    path = pattern_path(
+        coordinate_system=system,
+        theta_sampling=theta_sampling,
+        phi_sampling=[0.0, 5.0, 355.0],
+        peak_theta=0.0 if system in ("SPCS_CW", "SPCS_CCW") else 90.0,
+        peak_phi=0.0,
+    )
+    pattern = AntennaPattern(path, validate=False)
+    phi = pattern.Pattern_3D.coords["Phi"].values
+    assert phi.min() >= -180.0
+    assert phi.max() <= 179.0
+    assert not np.any(np.isclose(phi, 180.0))
+    assert np.any(np.isclose(phi, -180.0))
