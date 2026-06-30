@@ -31,3 +31,16 @@ def test_unknown_coordinate_system_raises(pattern_path):
     path = pattern_path(coordinate_system="SPCS_Unknown")
     with pytest.raises(ValueError, match="coordinate system"):
         AntennaPattern(path, validate=False)
+
+
+def test_substring_coordinate_system_not_treated_as_internal(pattern_path):
+    """Bug 3: substring check must be equality.
+
+    ``"SPCS_Eri"`` is a substring of ``"SPCS_Ericsson"``. The old
+    ``not in DEFAULT_INTERNAL_COORD_SYSTEM`` check treated it as already-internal
+    and skipped conversion. With ``!=`` it is correctly recognized as a distinct
+    (here unsupported) system and rejected.
+    """
+    path = pattern_path(coordinate_system="SPCS_Eri")
+    with pytest.raises(ValueError, match="coordinate system"):
+        AntennaPattern(path, validate=False)

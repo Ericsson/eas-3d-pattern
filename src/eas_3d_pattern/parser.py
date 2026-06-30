@@ -462,7 +462,7 @@ class AntennaPattern:
         )
 
         # coordinate system and grid
-        if self.coordinate_system not in DEFAULT_INTERNAL_COORD_SYSTEM:
+        if self.coordinate_system != DEFAULT_INTERNAL_COORD_SYSTEM:
             logger.warning(
                 f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'Pattern_3D' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
             )
