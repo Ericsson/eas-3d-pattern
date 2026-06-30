@@ -7,32 +7,30 @@ logger = logging.getLogger(__name__)
 SAMPLE_JSON: list[Path] = []
 
 try:
-    resource_names = list(importlib.resources.contents(__package__))
-    resource_names.sort()
+    anchor = importlib.resources.files(__package__)
+    resources = sorted(anchor.iterdir(), key=lambda res: res.name)
 
-    for item_name in resource_names:
-        if item_name.endswith(".json") and importlib.resources.is_resource(
-            __package__, item_name
-        ):
+    for resource in resources:
+        if resource.name.endswith(".json") and resource.is_file():
             try:
-                with importlib.resources.path(__package__, item_name) as path_context:
+                with importlib.resources.as_file(resource) as path_context:
                     resolved_path = Path(path_context)
 
                 if resolved_path.is_file():
                     SAMPLE_JSON.append(resolved_path)
                 else:
                     logger.warning(
-                        f"Path for sample '{item_name}' in '{__package__}' "
+                        f"Path for sample '{resource.name}' in '{__package__}' "
                         f" ('{resolved_path}') was not a file after context. Skipping."
                     )
             except FileNotFoundError:
                 logger.warning(
-                    f"Sample file '{item_name}' listed but not found by "
-                    f"importlib.resources.path in '{__package__}'. Skipping."
+                    f"Sample file '{resource.name}' listed but not found by "
+                    f"importlib.resources in '{__package__}'. Skipping."
                 )
             except Exception as e_path:
                 logger.error(
-                    f"Error resolving path for sample '{item_name}' in '{__package__}': {e_path}"
+                    f"Error resolving path for sample '{resource.name}' in '{__package__}': {e_path}"
                 )
 
     if SAMPLE_JSON:
