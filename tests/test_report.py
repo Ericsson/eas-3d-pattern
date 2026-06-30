@@ -61,3 +61,28 @@ def test_report_uses_module_logger():
         and node.func.value.id == "logging"
     ]
     assert root_logger_calls == [], root_logger_calls
+
+
+def test_generate_excel_report_handles_no_matching_subband(tmp_path):
+    """Bug 47: empty avg_df_list must not crash pd.concat.
+
+    When no antenna frequency falls in any configured subband, ``avg_df_list``
+    is empty and ``pd.concat([])`` raised ``ValueError: No objects to
+    concatenate``. The report must still be generated.
+    """
+    import pandas as pd
+
+    df = pd.DataFrame(
+        {
+            "Supplier": ["S"],
+            "Antenna_Model": ["M"],
+            "Revision_Version": ["R"],
+            "Array_ID": ["A"],
+            "Cell": [50.0],
+            "Theta_Electrical_Tilt": [0.0],
+            "Frequency_value": [100.0],  # below every SUBBANDS_DEFAULT range
+        }
+    )
+    report_name = tmp_path / "BEreport.xlsx"
+    report_mod._generate_excel_report(df, report_name, report_mod.SUBBANDS_DEFAULT)
+    assert report_name.is_file()

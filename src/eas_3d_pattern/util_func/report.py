@@ -269,7 +269,14 @@ def _generate_excel_report(
         )
         pivot_df["Average"] = pivot_df.mean(axis=1)
         avg_df_list.append(pivot_df.reset_index())
-    df_per_arrayandsubband_per_tilt = pd.concat(avg_df_list, ignore_index=True)
+    if avg_df_list:
+        df_per_arrayandsubband_per_tilt = pd.concat(avg_df_list, ignore_index=True)
+    else:
+        logger.warning(
+            "Report: No antenna frequency fell within any configured subband; "
+            "the per-subband sheet will be empty."
+        )
+        df_per_arrayandsubband_per_tilt = pd.DataFrame()
 
     with pd.ExcelWriter(report_name) as writer:
         df.to_excel(writer, index=False, sheet_name="Raw_Data")
