@@ -73,3 +73,17 @@ def test_beam_efficiency_zero_overall_power_raises(pattern_path):
     )
     with pytest.raises(ValueError, match="(?i)overall power"):
         pattern.calculate_beam_efficiency(sector_definitions=sectors)
+
+
+def test_empty_data_set_raises_clear_error(pattern_path):
+    """Bug 6: an empty Data_Set must raise a clear error early in __init__.
+
+    Previously an empty Data_Set surfaced only as a confusing downstream error
+    (sampling-count mismatch) or silently produced an empty dataset.
+    """
+    path = pattern_path(
+        data_set=[],
+        row_structure=["MagAttenuationTP", "MagAttenuationCo", "MagAttenuationCr"],
+    )
+    with pytest.raises(ValueError, match="(?i)data_set"):
+        AntennaPattern(path, validate=False)

@@ -78,6 +78,13 @@ class AntennaPattern:
         self.raw_data: dict[str, Any] = self._normalize_json(
             self._load_data_from_file(data_filepath)
         )
+        if not self.raw_data.get("Data_Set"):
+            logger.error(
+                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
+            )
+            raise ValueError(
+                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
+            )
         if validate and self._schema is not None:
             self._validate_data_against_schema(self.raw_data, self._schema)
 
