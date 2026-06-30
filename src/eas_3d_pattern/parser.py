@@ -539,6 +539,18 @@ class AntennaPattern:
                     Theta=("Theta", np.flip(theta)),
                     Phi=("Phi", -np.where(phi > 180, phi - 360, phi)),
                 )
+        new_theta = Pattern_3D.coords["Theta"].values
+        if new_theta.min() < 0 or new_theta.max() > 180:
+            logger.error(
+                f"AntennaPattern: Transformed theta out of range [0, 180] "
+                f"([{new_theta.min()}, {new_theta.max()}]) converting from "
+                f"'{from_system}'. Input data is likely out of spec for that system."
+            )
+            raise ValueError(
+                f"AntennaPattern: Transformed theta out of range [0, 180] "
+                f"([{new_theta.min()}, {new_theta.max()}]) converting from "
+                f"'{from_system}'. Input data is likely out of spec for that system."
+            )
         Pattern_3D = Pattern_3D.assign_attrs(
             coordinate_system=to_system,
         )
