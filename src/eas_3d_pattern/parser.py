@@ -41,6 +41,18 @@ ALTERNATIVES: dict[str, str] = {
     "Theta_Tilt": "Theta_Electrical_Tilt",
 }
 
+# Coordinate transforms into the internal SPCS_Ericsson frame.
+# Each entry maps (theta, phi) arrays -> (theta, phi) arrays. The phi operator
+# (>= vs >) and the leading negation differ per system and are load-bearing:
+# CW/Geo negate the wrapped value, so phi=180 maps consistently to -180 across
+# all four systems. The dict keys also serve as the whitelist of source systems.
+_TO_ERICSSON = {
+    "SPCS_Polar": lambda t, p: (t, np.where(p >= 180, p - 360, p)),
+    "SPCS_CW": lambda t, p: (t + 90, -np.where(p > 180, p - 360, p)),
+    "SPCS_CCW": lambda t, p: (t + 90, np.where(p >= 180, p - 360, p)),
+    "SPCS_Geo": lambda t, p: (np.flip(t), -np.where(p > 180, p - 360, p)),
+}
+
 
 class AntennaPattern:
     """Antenna pattern class to read, calculate and visualize JSON antenna pattern data.
@@ -512,8 +524,8 @@ class AntennaPattern:
             raise NotImplementedError(
                 f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default (SPCS_Ericsson) for now."
             )
-        transformable_systems = ("SPCS_Polar", "SPCS_CW", "SPCS_CCW", "SPCS_Geo")
-        if from_system not in transformable_systems:
+        transformable_systems = tuple(_TO_ERICSSON)
+        if from_system not in _TO_ERICSSON:
             logger.error(
                 f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
             )
@@ -522,30 +534,12 @@ class AntennaPattern:
             )
         phi = Pattern_3D.coords["Phi"].values
         theta = Pattern_3D.coords["Theta"].values
-        if from_system == "SPCS_Polar":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta),
-                    Phi=("Phi", np.where(phi >= 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_CW":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta + 90),
-                    Phi=("Phi", -np.where(phi > 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_CCW":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta + 90),
-                    Phi=("Phi", np.where(phi >= 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_Geo":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", np.flip(theta)),
-                    Phi=("Phi", -np.where(phi > 180, phi - 360, phi)),
-                )
+        # to_system is guaranteed SPCS_Ericsson by the guard above.
+        new_theta, new_phi = _TO_ERICSSON[from_system](theta, phi)
+        Pattern_3D = Pattern_3D.assign_coords(
+            Theta=("Theta", new_theta),
+            Phi=("Phi", new_phi),
+        )
         new_theta = Pattern_3D.coords["Theta"].values
         if new_theta.min() < 0 or new_theta.max() > 180:
             logger.error(
