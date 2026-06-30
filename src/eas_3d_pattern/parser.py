@@ -814,19 +814,30 @@ class AntennaPattern:
             vertical_cut_normed = vertical_cut["P_tp_dB"]
         else:
             vertical_cut_normed = vertical_cut["P_co_dB"]
+        # Fallback: if no point at/below -3 dB exists above the peak (e.g. a very
+        # narrow beam peaking at the top of the cut), the 3 dB border collapses to
+        # the peak theta itself instead of leaving ``top_border`` unbound.
+        top_border = float(theta_val_peak)
         for theta_val in np.flip(
             vertical_cut_normed.sel(Theta=slice(0, theta_val_peak))["Theta"]
         ):
             if vertical_cut_normed.sel(Theta=theta_val) <= -3:
                 top_border = float((theta_val + 1).values)
                 break
+        else:
+            logger.warning(
+                "AntennaPattern: No -3 dB crossing found above the peak; using peak theta as top 3 dB border."
+            )
 
         # enrich with top_3db_point
         self.Pattern_3D.attrs["top_3db_point"] = top_border
         return top_border
 
     def plot(
-        self, component_name: str = "P_tp_dB", show_fig: bool = True, remove_layout_components: bool = False
+        self,
+        component_name: str = "P_tp_dB",
+        show_fig: bool = True,
+        remove_layout_components: bool = False,
     ) -> None | go.Figure:
         """Plots the radiation pattern as heatmap.
 
@@ -866,7 +877,7 @@ class AntennaPattern:
                     "val = %{z:.2f}<br>"
                     "<extra></extra>"
                 ),
-                showscale=not(remove_layout_components),
+                showscale=not (remove_layout_components),
             )
         )
         fig.update_yaxes(autorange="reversed")
@@ -884,7 +895,7 @@ class AntennaPattern:
                     "zeroline": False,
                     "showline": False,
                 },
-                plot_bgcolor="rgba(0,0,0,0)",   # sin fondo gris en el área del heatmap
+                plot_bgcolor="rgba(0,0,0,0)",  # sin fondo gris en el área del heatmap
                 paper_bgcolor="rgba(0,0,0,0)",  # sin fondo/gris alrededor
                 margin={"t": 0, "l": 0, "r": 0, "b": 0},  # recorta al mínimo
                 height=500,
