@@ -59,6 +59,7 @@ nbformat = "^5.10.4"
 ruff = "^0.11.12"
 mypy = "^1.16.0"
 pre-commit = "^4.2.0"
+pytest = "^8.0"
 
 [tool.poetry.group.typing.dependencies]
 pandas-stubs = "2.2.2.240909"
@@ -153,6 +154,14 @@ quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
 
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
 
 [tool.mypy]
 python_version = "3.13"

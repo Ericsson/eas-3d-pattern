@@ -6,7 +6,10 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from eas_3d_pattern import AntennaPattern, SectorDefinition
+from ..parser import AntennaPattern
+from ..sector_definitions import SectorDefinition
+
+logger = logging.getLogger(__name__)
 
 SUBBANDS_DEFAULT = {
     "698-806": (698, 806),
@@ -80,6 +83,7 @@ def generate_report_eas(
     output_directory.mkdir(parents=True, exist_ok=True)
 
     df_list: list[pd.DataFrame] = []
+    skipped_files: list[str] = []
     with temporarily_set_loglevel(logger_name="eas_3d_pattern", level=logging.ERROR):
         for file in tqdm(files):
             data = _process_a_file(file)
@@ -87,8 +91,24 @@ def generate_report_eas(
                 data_row, pattern, sectors = data
                 df_list.append(data_row)
                 if plot:
-                    _save_figure(pattern, sectors, output_directory, remove_layout_components)
-        df_raw = pd.concat(df_list, ignore_index=True)
+                    _save_figure(
+                        pattern, sectors, output_directory, remove_layout_components
+                    )
+            else:
+                skipped_files.append(file.name)
+
+    if skipped_files:
+        logger.warning(
+            f"Report: skipped {len(skipped_files)} of {len(files)} file(s) due to processing errors: {skipped_files}"
+        )
+    if not df_list:
+        logger.error(
+            f"Report: all {len(files)} file(s) were skipped due to errors; no report generated."
+        )
+        raise ValueError(
+            f"Report: all {len(files)} file(s) were skipped due to errors; no report generated."
+        )
+    df_raw = pd.concat(df_list, ignore_index=True)
 
     report_name = output_directory / "BEreport.xlsx"
     _generate_excel_report(df_raw, report_name, subbands)
@@ -118,7 +138,7 @@ def _process_a_file(
         top_border = pattern.calculate_top_3db_point(power=False)
         eas_sectors = SectorDefinition(load_default=True, top_border=top_border)
         if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] < -20):
-            logging.info(
+            logger.info(
                 "Reporting: Identified dual beam antenna. Overwriting sectors to dual beam definition for reporting."
             )
             eas_sectors.add_sector(
@@ -136,7 +156,7 @@ def _process_a_file(
                 phi_max=(180.0, "<="),
             )
         if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] > 20):
-            logging.info(
+            logger.info(
                 "Reporting: Identified dual beam antenna. Changing sectors to dual beam definition for reporting."
             )
             eas_sectors.add_sector(
@@ -169,7 +189,7 @@ def _process_a_file(
         data["filepath"] = str(pattern.data_filepath)
         return (pd.json_normalize(data, sep="_"), pattern, eas_sectors)
     except Exception as e:
-        logging.error(
+        logger.error(
             f"Reporting: Skipping corrupted or invalid file '{file_path.name}': {e}"
         )
         return None
@@ -192,7 +212,9 @@ def _save_figure(
     Returns:
         None
     """
-    fig = pattern.plot(show_fig=False,remove_layout_components=remove_layout_components)
+    fig = pattern.plot(
+        show_fig=False, remove_layout_components=remove_layout_components
+    )
     if fig is None:
         return
     for k in sector_definitions.sectors:
@@ -262,7 +284,13 @@ def _generate_excel_report(
         )
         pivot_df["Average"] = pivot_df.mean(axis=1)
         avg_df_list.append(pivot_df.reset_index())
-    df_per_arrayandsubband_per_tilt = pd.concat(avg_df_list, ignore_index=True)
+    if avg_df_list:
+        df_per_arrayandsubband_per_tilt = pd.concat(avg_df_list, ignore_index=True)
+    else:
+        logger.warning(
+            "Report: No antenna frequency fell within any configured subband; the per-subband sheet will be empty."
+        )
+        df_per_arrayandsubband_per_tilt = pd.DataFrame()
 
     with pd.ExcelWriter(report_name) as writer:
         df.to_excel(writer, index=False, sheet_name="Raw_Data")
@@ -273,5 +301,5 @@ def _generate_excel_report(
         df_per_arrayandsubband_per_tilt.to_excel(
             writer, index=False, sheet_name="Mean_ArrayID_Subband_Tilt"
         )
-    logging.info("Report: ✨Generated EAS BE report in %s✨", report_name)
+    logger.info("Report: ✨Generated EAS BE report in %s✨", report_name)
     return None

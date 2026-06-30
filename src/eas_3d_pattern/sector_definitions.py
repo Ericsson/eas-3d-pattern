@@ -59,11 +59,7 @@ class BoundaryBoxSquare:
             )
 
     def __str__(self):
-        return (
-            f"'{self.name}': \t"
-            f"[{self.theta_min[0]:.1f}{self.theta_min[1]}Theta{self.theta_max[1]}{self.theta_max[0]:.1f}], "
-            f"[{self.phi_min[0]:.1f}{self.phi_min[1]}Phi{self.phi_max[1]}{self.phi_max[0]:.1f}]"
-        )
+        return f"'{self.name}': \t[{self.theta_min[0]:.1f}{self.theta_min[1]}Theta{self.theta_max[1]}{self.theta_max[0]:.1f}], [{self.phi_min[0]:.1f}{self.phi_min[1]}Phi{self.phi_max[1]}{self.phi_max[0]:.1f}]"
 
 
 class SectorDefinition:

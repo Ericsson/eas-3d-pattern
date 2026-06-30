@@ -160,9 +160,11 @@ class SchemaManager:
             f"SchemaManager: Attempting to load bundled schema: {self.bundled_package_ref}/{self.bundled_filename}"
         )
         try:
-            with importlib.resources.open_text(
-                self.bundled_package_ref, self.bundled_filename
-            ) as sf:
+            schema_resource = (
+                importlib.resources.files(self.bundled_package_ref)
+                / self.bundled_filename
+            )
+            with schema_resource.open(encoding="utf-8") as sf:
                 content = json.load(sf)
             self.source_message = (
                 f"Bundled Schema ({self.bundled_package_ref}/{self.bundled_filename})"
@@ -205,11 +207,7 @@ class SchemaManager:
             ) from e
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__}(id=0x{id(self):x}, "
-            f"schema_loaded={'True' if self.schema_content else 'False'}, "
-            f"source={self.source_message})>"
-        )
+        return f"<{self.__class__.__name__}(id=0x{id(self):x}, schema_loaded={'True' if self.schema_content else 'False'}, source={self.source_message})>"
 
     def __str__(self) -> str:
         return str(self.schema_content)

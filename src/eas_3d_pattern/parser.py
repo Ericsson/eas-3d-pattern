@@ -41,6 +41,18 @@ ALTERNATIVES: dict[str, str] = {
     "Theta_Tilt": "Theta_Electrical_Tilt",
 }
 
+# Coordinate transforms into the internal SPCS_Ericsson frame.
+# Each entry maps (theta, phi) arrays -> (theta, phi) arrays. The phi operator
+# (>= vs >) and the leading negation differ per system and are load-bearing:
+# CW/Geo negate the wrapped value, so phi=180 maps consistently to -180 across
+# all four systems. The dict keys also serve as the whitelist of source systems.
+_TO_ERICSSON = {
+    "SPCS_Polar": lambda t, p: (t, np.where(p >= 180, p - 360, p)),
+    "SPCS_CW": lambda t, p: (t + 90, -np.where(p > 180, p - 360, p)),
+    "SPCS_CCW": lambda t, p: (t + 90, np.where(p >= 180, p - 360, p)),
+    "SPCS_Geo": lambda t, p: (np.flip(t), -np.where(p > 180, p - 360, p)),
+}
+
 
 class AntennaPattern:
     """Antenna pattern class to read, calculate and visualize JSON antenna pattern data.
@@ -78,7 +90,21 @@ class AntennaPattern:
         self.raw_data: dict[str, Any] = self._normalize_json(
             self._load_data_from_file(data_filepath)
         )
-        if validate and self._schema is not None:
+        if not self.raw_data.get("Data_Set"):
+            logger.error(
+                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
+            )
+            raise ValueError(
+                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
+            )
+        if validate:
+            if self._schema is None:
+                logger.error(
+                    "AntennaPattern: Validation requested but no schema is available."
+                )
+                raise ValueError(
+                    "AntennaPattern: Validation requested but no schema is available."
+                )
             self._validate_data_against_schema(self.raw_data, self._schema)
 
         # ---- Process the pattern data into one normalized format ----
@@ -142,12 +168,7 @@ class AntennaPattern:
             error_path_str = (
                 " -> ".join(map(str, e.path)) if e.path else "document root"
             )
-            full_error_message = (
-                f"Antenna data validation FAILED for '{self.data_filepath}'.\n"
-                f"Schema source: '{NGMNSchema.source_message}'.\n"
-                f"Error at data path: '{error_path_str}'.\n"
-                f"Validation Message: {e.message} (Validator: '{e.validator}')"
-            )
+            full_error_message = f"Antenna data validation FAILED for '{self.data_filepath}'.\nSchema source: '{NGMNSchema.source_message}'.\nError at data path: '{error_path_str}'.\nValidation Message: {e.message} (Validator: '{e.validator}')"
             logger.error(full_error_message)
             raise ValidationError(full_error_message) from e
 
@@ -462,7 +483,7 @@ class AntennaPattern:
         )
 
         # coordinate system and grid
-        if self.coordinate_system not in DEFAULT_INTERNAL_COORD_SYSTEM:
+        if self.coordinate_system != DEFAULT_INTERNAL_COORD_SYSTEM:
             logger.warning(
                 f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'Pattern_3D' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
             )
@@ -498,32 +519,38 @@ class AntennaPattern:
             raise NotImplementedError(
                 f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default (SPCS_Ericsson) for now."
             )
+        transformable_systems = tuple(_TO_ERICSSON)
+        if from_system not in _TO_ERICSSON:
+            logger.error(
+                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
+            )
+            raise ValueError(
+                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
+            )
         phi = Pattern_3D.coords["Phi"].values
         theta = Pattern_3D.coords["Theta"].values
-        if from_system == "SPCS_Polar":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta),
-                    Phi=("Phi", np.where(phi >= 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_CW":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta + 90),
-                    Phi=("Phi", -np.where(phi > 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_CCW":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", theta + 90),
-                    Phi=("Phi", np.where(phi >= 180, phi - 360, phi)),
-                )
-        if from_system == "SPCS_Geo":
-            if to_system == "SPCS_Ericsson":
-                Pattern_3D = Pattern_3D.assign_coords(
-                    Theta=("Theta", np.flip(theta)),
-                    Phi=("Phi", -np.where(phi > 180, phi - 360, phi)),
-                )
+        # to_system is guaranteed SPCS_Ericsson by the guard above.
+        new_theta, new_phi = _TO_ERICSSON[from_system](theta, phi)
+        Pattern_3D = Pattern_3D.assign_coords(
+            Theta=("Theta", new_theta),
+            Phi=("Phi", new_phi),
+        )
+        new_theta = Pattern_3D.coords["Theta"].values
+        if new_theta.min() < 0 or new_theta.max() > 180:
+            logger.error(
+                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
+            )
+            raise ValueError(
+                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
+            )
+        new_phi = Pattern_3D.coords["Phi"].values
+        if new_phi.min() < -180 or new_phi.max() > 179:
+            logger.error(
+                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
+            )
+            raise ValueError(
+                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
+            )
         Pattern_3D = Pattern_3D.assign_attrs(
             coordinate_system=to_system,
         )
@@ -700,6 +727,13 @@ class AntennaPattern:
 
         weighted_field_values = self.Pattern_3D["dOmega"] * field_values
         Sp_overall = float(weighted_field_values.sum())
+        if Sp_overall == 0:
+            logger.error(
+                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
+            )
+            raise ValueError(
+                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
+            )
 
         operators_dict = {
             "<": operator.lt,
@@ -814,19 +848,37 @@ class AntennaPattern:
             vertical_cut_normed = vertical_cut["P_tp_dB"]
         else:
             vertical_cut_normed = vertical_cut["P_co_dB"]
+        # Fallback: if no point at/below -3 dB exists above the peak (e.g. a very
+        # narrow beam peaking at the top of the cut), the 3 dB border collapses to
+        # the peak theta itself instead of leaving ``top_border`` unbound.
+        top_border = float(theta_val_peak)
+        # Advance the border by the actual theta grid step rather than a hardcoded
+        # 1 deg, so the result is correct for any sampling resolution.
+        theta_axis = np.sort(vertical_cut_normed["Theta"].values)
+        if theta_axis.size > 1:
+            grid_step = float(np.median(np.diff(theta_axis)))
+        else:
+            grid_step = 1.0
         for theta_val in np.flip(
             vertical_cut_normed.sel(Theta=slice(0, theta_val_peak))["Theta"]
         ):
             if vertical_cut_normed.sel(Theta=theta_val) <= -3:
-                top_border = float((theta_val + 1).values)
+                top_border = float(theta_val.values) + grid_step
                 break
+        else:
+            logger.warning(
+                "AntennaPattern: No -3 dB crossing found above the peak; using peak theta as top 3 dB border."
+            )
 
         # enrich with top_3db_point
         self.Pattern_3D.attrs["top_3db_point"] = top_border
         return top_border
 
     def plot(
-        self, component_name: str = "P_tp_dB", show_fig: bool = True, remove_layout_components: bool = False
+        self,
+        component_name: str = "P_tp_dB",
+        show_fig: bool = True,
+        remove_layout_components: bool = False,
     ) -> None | go.Figure:
         """Plots the radiation pattern as heatmap.
 
@@ -860,13 +912,8 @@ class AntennaPattern:
                 zmin=-30,
                 zmax=0,
                 colorbar={"title": component_name, "thickness": 9},
-                hovertemplate=(
-                    "φ = %{x:.0f}°<br>"
-                    "θ = %{y:.0f}°<br>"
-                    "val = %{z:.2f}<br>"
-                    "<extra></extra>"
-                ),
-                showscale=not(remove_layout_components),
+                hovertemplate="φ = %{x:.0f}°<br>θ = %{y:.0f}°<br>val = %{z:.2f}<br><extra></extra>",
+                showscale=not (remove_layout_components),
             )
         )
         fig.update_yaxes(autorange="reversed")
@@ -884,7 +931,7 @@ class AntennaPattern:
                     "zeroline": False,
                     "showline": False,
                 },
-                plot_bgcolor="rgba(0,0,0,0)",   # sin fondo gris en el área del heatmap
+                plot_bgcolor="rgba(0,0,0,0)",  # sin fondo gris en el área del heatmap
                 paper_bgcolor="rgba(0,0,0,0)",  # sin fondo/gris alrededor
                 margin={"t": 0, "l": 0, "r": 0, "b": 0},  # recorta al mínimo
                 height=500,
@@ -1077,11 +1124,11 @@ class AntennaPattern:
             "==== Parameters ====",
             f"  Gain [dbi]: {self.gain_dbi if self.gain_dbi is not None else 'N/A'}",
             f"  EIRP [dBm]: {self.eirp_dbm if self.eirp_dbm is not None else 'N/A'}",
-            f"  Phi HPBW [deg]: {self.phi_hpbw if self.phi_hpbw else 'N/A'}",
-            f"  Theta HPBW [deg]: {self.theta_hpbw if self.theta_hpbw else 'N/A'}",
-            f"  Front to Back [db]: {self.front_to_back if self.front_to_back else 'N/A'}",
+            f"  Phi HPBW [deg]: {self.phi_hpbw if self.phi_hpbw is not None else 'N/A'}",
+            f"  Theta HPBW [deg]: {self.theta_hpbw if self.theta_hpbw is not None else 'N/A'}",
+            f"  Front to Back [db]: {self.front_to_back if self.front_to_back is not None else 'N/A'}",
             "==== Frequency & Tilt ====",
-            f"  Frequency [Hz]: {self.frequency_hz if self.frequency_hz else 'N/A'}",
+            f"  Frequency [Hz]: {self.frequency_hz if self.frequency_hz is not None else 'N/A'}",
             f"  Frequency Range [Hz]: {self.frequency_range if self.frequency_range is not None else 'N/A'}",
             f"  Theta Electrical Tilt [deg]: {self.theta_eletrical_tilt if self.theta_eletrical_tilt is not None else 'N/A'}",
             f"  Phi Electrical Pan [deg]: {self.phi_eletrical_pan if self.phi_eletrical_pan is not None else 'N/A'}",
@@ -1093,7 +1140,4 @@ class AntennaPattern:
         return "\n".join(lines)
 
     def __repr__(self) -> str:
-        return (
-            f"<AntennaPattern(data_filepath='{self.data_filepath}', "
-            f"model='{self.antenna_model}', supplier='{self.supplier}')>"
-        )
+        return f"<AntennaPattern(data_filepath='{self.data_filepath}', model='{self.antenna_model}', supplier='{self.supplier}')>"
