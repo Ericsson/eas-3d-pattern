@@ -100,3 +100,17 @@ def test_top_3db_point_uses_grid_step_not_hardcoded_one(pattern_path):
     pattern = AntennaPattern(path, validate=False)
     top = pattern.calculate_top_3db_point(power=False)
     assert top == 85.0
+
+
+def test_validate_true_without_schema_raises(pattern_path, monkeypatch):
+    """Bug 46: requesting validation with no schema must not silently skip it.
+
+    If the schema failed to load, ``validate=True`` previously did nothing and
+    gave no signal. It must raise so the caller knows validation was not done.
+    """
+    from eas_3d_pattern.schema_manager import NGMNSchema
+
+    monkeypatch.setattr(NGMNSchema, "schema_content", None)
+    path = pattern_path()
+    with pytest.raises(ValueError, match="(?i)schema"):
+        AntennaPattern(path, validate=True)

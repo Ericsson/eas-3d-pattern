@@ -85,7 +85,14 @@ class AntennaPattern:
             raise ValueError(
                 f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
             )
-        if validate and self._schema is not None:
+        if validate:
+            if self._schema is None:
+                logger.error(
+                    "AntennaPattern: Validation requested but no schema is available."
+                )
+                raise ValueError(
+                    "AntennaPattern: Validation requested but no schema is available."
+                )
             self._validate_data_against_schema(self.raw_data, self._schema)
 
         # ---- Process the pattern data into one normalized format ----
