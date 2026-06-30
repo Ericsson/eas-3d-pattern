@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from eas_3d_pattern import AntennaPattern
 
@@ -19,3 +20,14 @@ def test_top_3db_point_no_crossing_does_not_raise(pattern_path):
     top = pattern.calculate_top_3db_point(power=False)
     assert isinstance(top, float)
     assert np.isfinite(top)
+
+
+def test_unknown_coordinate_system_raises(pattern_path):
+    """Bug 2: an unrecognized coordinate system must not silently no-op.
+
+    Previously ``_change_coordinate_system`` matched no branch for an unknown
+    system yet still stamped the attrs as converted. It must raise instead.
+    """
+    path = pattern_path(coordinate_system="SPCS_Unknown")
+    with pytest.raises(ValueError, match="coordinate system"):
+        AntennaPattern(path, validate=False)

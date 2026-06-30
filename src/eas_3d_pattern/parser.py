@@ -498,6 +498,14 @@ class AntennaPattern:
             raise NotImplementedError(
                 f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default (SPCS_Ericsson) for now."
             )
+        transformable_systems = ("SPCS_Polar", "SPCS_CW", "SPCS_CCW", "SPCS_Geo")
+        if from_system not in transformable_systems:
+            logger.error(
+                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
+            )
+            raise ValueError(
+                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
+            )
         phi = Pattern_3D.coords["Phi"].values
         theta = Pattern_3D.coords["Theta"].values
         if from_system == "SPCS_Polar":
