@@ -6,7 +6,8 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from eas_3d_pattern import AntennaPattern, SectorDefinition
+from ..parser import AntennaPattern
+from ..sector_definitions import SectorDefinition
 
 SUBBANDS_DEFAULT = {
     "698-806": (698, 806),
@@ -87,7 +88,9 @@ def generate_report_eas(
                 data_row, pattern, sectors = data
                 df_list.append(data_row)
                 if plot:
-                    _save_figure(pattern, sectors, output_directory, remove_layout_components)
+                    _save_figure(
+                        pattern, sectors, output_directory, remove_layout_components
+                    )
         df_raw = pd.concat(df_list, ignore_index=True)
 
     report_name = output_directory / "BEreport.xlsx"
@@ -192,7 +195,9 @@ def _save_figure(
     Returns:
         None
     """
-    fig = pattern.plot(show_fig=False,remove_layout_components=remove_layout_components)
+    fig = pattern.plot(
+        show_fig=False, remove_layout_components=remove_layout_components
+    )
     if fig is None:
         return
     for k in sector_definitions.sectors:
