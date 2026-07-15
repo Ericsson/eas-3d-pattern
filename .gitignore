@@ -180,3 +180,4 @@ pyrightconfig.json
 .transition/
 .ngmn_json_schema_cache/
 tmp/
+plan.md
