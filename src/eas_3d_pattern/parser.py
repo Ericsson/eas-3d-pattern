@@ -108,6 +108,7 @@ class AntennaPattern:
             self._validate_data_against_schema(self.raw_data, self._schema)
 
         # ---- Process the pattern data into one normalized format ----
+        self._sector_preset: str = "eas"
         self.Pattern_3D: xr.Dataset = self._process_pattern_data()
 
     def _load_data_from_file(self, filepath: str) -> dict[str, Any]:
@@ -351,6 +352,44 @@ class AntennaPattern:
     @property
     def optional_comments(self) -> str:
         return str(self.raw_data["Optional_Comments"])
+
+    @property
+    def sector_preset(self) -> str:
+        """The active sector preset name used by ``calculate_beam_efficiency()``.
+
+        Defaults to ``"eas"``. Set to a different preset name to change the
+        sector geometry used when ``sector_definitions`` is not explicitly passed.
+
+        Raises:
+            ValueError: If assigned a name not in ``available_sector_presets()``.
+        """
+        return self._sector_preset
+
+    @sector_preset.setter
+    def sector_preset(self, value: str) -> None:
+        available = SectorDefinition.presets()
+        if value not in available:
+            raise ValueError(
+                f"AntennaPattern: Unknown preset '{value}'. "
+                f"Available presets: {available}"
+            )
+        self._sector_preset = value
+
+    @classmethod
+    def available_sector_presets(cls) -> list[str]:
+        """Return the list of available sector preset names.
+
+        Convenience accessor so users can discover presets directly from
+        AntennaPattern without importing SectorDefinition separately.
+
+        Returns:
+            list[str]: Names that can be passed to ``sector_preset``.
+
+        Example:
+            >>> AntennaPattern.available_sector_presets()
+            ['eas', 'ngmn-v13-type-a']
+        """
+        return SectorDefinition.presets()
 
     @property
     def theta_sampling(self) -> np.ndarray | None:
@@ -651,6 +690,41 @@ class AntennaPattern:
             )
         return float(self.gain_dbi - self.calculate_directivity())
 
+    def _build_sectors_from_preset(self) -> SectorDefinition:
+        """Build a SectorDefinition from the active preset and pattern metadata.
+
+        Dispatches to the correct preset builder based on ``self._sector_preset``.
+
+        Returns:
+            SectorDefinition: Configured sector definition for this pattern.
+
+        Raises:
+            ValueError: If required metadata is missing for the selected preset.
+        """
+        if self._sector_preset == "eas":
+            top_border = self.calculate_top_3db_point(power=False)
+            return SectorDefinition.from_preset("eas", top_border=top_border)
+
+        if self._sector_preset == "ngmn-v13-type-a":
+            theta_peak, _ = self.find_peak_coordinates(power=False)
+            theta_hpbw = self.raw_data.get("Theta_HPBW")
+            phi_hpbw = self.raw_data.get("Phi_HPBW")
+            if theta_hpbw is None or phi_hpbw is None:
+                raise ValueError(
+                    "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
+                )
+            phi_nominal = self.phi_eletrical_pan or 0.0
+            return SectorDefinition.from_preset(
+                "ngmn-v13-type-a",
+                theta_beam_peak=theta_peak,
+                theta_hpbw=float(theta_hpbw),
+                phi_nominal_direction=phi_nominal,
+                nominal_sector_phi=float(phi_hpbw),
+            )
+
+        # Fallback for future presets registered externally
+        return SectorDefinition.from_preset(self._sector_preset)
+
     def calculate_beam_efficiency(
         self, sector_definitions: SectorDefinition | None = None, powersum: bool = True
     ) -> dict[str, float]:
@@ -691,13 +765,7 @@ class AntennaPattern:
             "AntennaPattern: Calculating beam efficiency of antenna pattern data."
         )
         if sector_definitions is None:
-            logger.warning(
-                "AntennaPattern: SectorDefinition is not defined. Taking default settings for beam efficiency calculation."
-            )
-            top_border = self.calculate_top_3db_point(power=False)
-            sector_definitions = SectorDefinition(
-                load_default=True, top_border=top_border
-            )
+            sector_definitions = self._build_sectors_from_preset()
 
         if powersum:
             field_values = self.Pattern_3D["P_tp_lin"]
