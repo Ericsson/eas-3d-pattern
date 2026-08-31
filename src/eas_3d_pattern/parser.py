@@ -620,7 +620,7 @@ class AntennaPattern:
 
         Directivity is calculated with the average radiation intensity over the whole sphere and the maximum radiation intensity.
         Can only be calculated if data is complete (full sphere). Regular grids are advised.
-        Fancy geometry calculation with something like Delaunay+Voronoi is not supported for now.
+        More advanced geometry calculation with something like Delaunay+Voronoi is not supported for now.
 
         Args:
             None
@@ -947,7 +947,7 @@ class AntennaPattern:
         component_name: str = "P_tp_dB",
         show_fig: bool = True,
         remove_layout_components: bool = False,
-    ) -> None | go.Figure:
+    ) -> go.Figure | None:
         """Plots the radiation pattern as heatmap.
 
         Plots with plotly the radiation pattern as heatmap.

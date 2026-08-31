@@ -60,6 +60,7 @@ ruff = "^0.11.12"
 mypy = "^1.16.0"
 pre-commit = "^4.2.0"
 pytest = "^8.0"
+jupyterlab = "^4.6.2"
 
 [tool.poetry.group.typing.dependencies]
 pandas-stubs = "2.2.2.240909"
