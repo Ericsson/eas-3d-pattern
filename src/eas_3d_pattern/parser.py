@@ -4,6 +4,7 @@ import logging
 import operator
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,7 @@ import plotly.graph_objects as go
 import xarray as xr
 from jsonschema import ValidationError, validate
 
+from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import (
     BoundaryBoxSquare,
@@ -615,6 +617,42 @@ class AntennaPattern:
         metadata.pop("Data_Set_Row_Structure", None)
         return metadata
 
+    def _ensure_domega(self) -> None:
+        """Ensure the solid-angle weight ``dOmega`` exists on ``Pattern_3D``.
+
+        Computes ``dOmega = sin(theta) * dTheta * dPhi`` and injects it as a data variable,
+        which is what turns a plain sum over grid points into a solid-angle-weighted
+        integral over the sphere. No-op if it is already present, so the cost is paid once
+        per pattern.
+
+        ``np.gradient`` is applied to the coordinate arrays themselves, so it yields the
+        local spacing at each point and therefore handles unevenly spaced grids as well as
+        regular ones.
+
+        Note:
+            This mutates ``self.Pattern_3D`` in place. The side effect is deliberate and
+            relied upon as a cache by ``calculate_directivity()`` and
+            ``calculate_beam_efficiency()``.
+        """
+        if "dOmega" in self.Pattern_3D.data_vars:
+            return
+
+        weight = np.repeat(
+            np.sin(np.deg2rad(self.Pattern_3D.Theta.values)).T[:, None],
+            len(self.Pattern_3D.Phi),
+            axis=1,
+        )
+        dTheta = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Theta"]))).reshape(
+            -1, 1
+        )
+        dPhi = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Phi"]))).reshape(1, -1)
+        self.Pattern_3D["dOmega"] = xr.DataArray(
+            weight * (dTheta * dPhi),
+            dims=("Theta", "Phi"),
+            coords={"Theta": self.Pattern_3D.Theta, "Phi": self.Pattern_3D.Phi},
+            name="dOmega",
+        )
+
     def calculate_directivity(self) -> float:
         """Calculate the directivity of the antenna pattern data.
 
@@ -636,26 +674,7 @@ class AntennaPattern:
             >>> losses = gain_dbi - directivity_dbi
         """
         logger.debug("AntennaPattern: Calculating directivity of antenna pattern data.")
-        if "dOmega" not in list(self.Pattern_3D.data_vars.keys()):
-            weight = np.repeat(
-                np.sin(np.deg2rad(self.Pattern_3D.Theta.values)).T[:, None],
-                len(self.Pattern_3D.Phi),
-                axis=1,
-            )
-            dTheta = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Theta"]))).reshape(
-                -1, 1
-            )
-            dPhi = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Phi"]))).reshape(
-                1, -1
-            )
-            factor = dTheta * dPhi
-            dOmega = weight * factor
-            self.Pattern_3D["dOmega"] = xr.DataArray(
-                dOmega,
-                dims=("Theta", "Phi"),
-                coords={"Theta": self.Pattern_3D.Theta, "Phi": self.Pattern_3D.Phi},
-                name="dOmega",
-            )
+        self._ensure_domega()
         Umax = float(self.Pattern_3D["P_tp_lin"].max())
         Uavg = float(
             (self.Pattern_3D["P_tp_lin"] * self.Pattern_3D["dOmega"]).sum(
@@ -772,26 +791,7 @@ class AntennaPattern:
         else:
             field_values = self.Pattern_3D["P_co_lin"]
 
-        if "dOmega" not in list(self.Pattern_3D.data_vars.keys()):
-            weight = np.repeat(
-                np.sin(np.deg2rad(self.Pattern_3D.Theta.values)).T[:, None],
-                len(self.Pattern_3D.Phi),
-                axis=1,
-            )
-            dTheta = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Theta"]))).reshape(
-                -1, 1
-            )
-            dPhi = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Phi"]))).reshape(
-                1, -1
-            )
-            factor = dTheta * dPhi
-            dOmega = weight * factor
-            self.Pattern_3D["dOmega"] = xr.DataArray(
-                dOmega,
-                dims=("Theta", "Phi"),
-                coords={"Theta": self.Pattern_3D.Theta, "Phi": self.Pattern_3D.Phi},
-                name="dOmega",
-            )
+        self._ensure_domega()
 
         weighted_field_values = self.Pattern_3D["dOmega"] * field_values
         Sp_overall = float(weighted_field_values.sum())
@@ -950,92 +950,26 @@ class AntennaPattern:
     ) -> go.Figure | None:
         """Plots the radiation pattern as heatmap.
 
-        Plots with plotly the radiation pattern as heatmap.
-        Normalized radation pattern are shown in dB.
+        Delegates figure construction to :func:`eas_3d_pattern._plotting.build_heatmap`.
 
         Args:
             component_name (str, optional): Name of the component to be plotted. Defaults to 'P_tp_dB', thus power pattern.
             show_fig (bool, optional): Whether to show the figure. Defaults to True.
             remove_layout_components (bool, optional): Whether to remove text, color bar and tick labels from plots of the antenna patterns. Default is False.
 
+        Raises:
+            ValueError: If ``component_name`` is not present in the pattern data.
 
         Returns:
             go.Figure | None: The figure if show_fig is False, otherwise None (the figure is displayed instead).
 
         """
-        if component_name not in self.Pattern_3D.data_vars:
-            logger.error(
-                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
-            )
-            raise ValueError(
-                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
-            )
-
-        fig = go.Figure(
-            data=go.Heatmap(
-                z=self.Pattern_3D[component_name].values,
-                x=self.Pattern_3D["Phi"].values,
-                y=self.Pattern_3D["Theta"].values,
-                colorscale="turbo",
-                zmin=-30,
-                zmax=0,
-                colorbar={"title": component_name, "thickness": 9},
-                hovertemplate="φ = %{x:.0f}°<br>θ = %{y:.0f}°<br>val = %{z:.2f}<br><extra></extra>",
-                showscale=not (remove_layout_components),
-            )
+        fig = build_heatmap(
+            self.Pattern_3D,
+            title=Path(self.data_filepath).name,
+            component_name=component_name,
+            remove_layout_components=remove_layout_components,
         )
-        fig.update_yaxes(autorange="reversed")
-        if remove_layout_components:
-            fig.update_layout(
-                xaxis={
-                    "showticklabels": False,
-                    "showgrid": False,
-                    "zeroline": False,
-                    "showline": False,
-                },
-                yaxis={
-                    "showticklabels": False,
-                    "showgrid": False,
-                    "zeroline": False,
-                    "showline": False,
-                },
-                plot_bgcolor="rgba(0,0,0,0)",  # sin fondo gris en el área del heatmap
-                paper_bgcolor="rgba(0,0,0,0)",  # sin fondo/gris alrededor
-                margin={"t": 0, "l": 0, "r": 0, "b": 0},  # recorta al mínimo
-                height=500,
-            )
-        else:
-            fig.update_layout(
-                title={
-                    "text": os.path.basename(self.data_filepath),
-                    "x": 0.5,
-                    "y": 0.93,
-                    "yanchor": "bottom",
-                    "font": {"size": 16},
-                },
-                xaxis={
-                    "title": "φ [°]",
-                    "tickmode": "linear",
-                    "title_standoff": 10,
-                    "dtick": 30,
-                    "showgrid": True,
-                    "tickangle": -45,
-                    "gridcolor": "rgba(0,0,0,0.2)",
-                    "zeroline": False,
-                },
-                yaxis={
-                    "title": "θ [°]",
-                    "tickmode": "linear",
-                    "title_standoff": 10,
-                    "dtick": 30,
-                    "showgrid": True,
-                    "gridcolor": "rgba(0,0,0,0.2)",
-                    "zeroline": False,
-                },
-                margin={"t": 40, "l": 60, "r": 60, "b": 60},
-                height=500,
-            )
-
         if show_fig:
             fig.show()
             return None
@@ -1050,8 +984,7 @@ class AntennaPattern:
     ) -> go.Figure | None:
         """Plots the radiation pattern as 3D polar plot.
 
-        Plots with plotly the radiation pattern as 3D polar plot.
-        dB_floor is set to -30 as average baseline.
+        Delegates figure construction to :func:`eas_3d_pattern._plotting.build_polar_3d`.
 
         Args:
             component_name (str, optional): Name of the component to be plotted. Defaults to 'P_tp_dB', thus power pattern.
@@ -1059,115 +992,20 @@ class AntennaPattern:
             show_axes_arrows (bool, optional): Shows coordinate axes arrows in the plot. Defaults to True.
             show_fig (bool, optional): Whether to show the figure. Defaults to True.
 
+        Raises:
+            ValueError: If ``component_name`` is not present in the pattern data.
+
         Returns:
             go.Figure | None: The figure if show_fig is False, otherwise None (the figure is displayed instead).
 
         """
-        if component_name not in self.Pattern_3D.data_vars:
-            logger.error(
-                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
-            )
-            raise ValueError(
-                f"AntennaPattern: Component '{component_name}' not found. Make sure to select a component with data."
-            )
-
-        theta_rad = np.radians(self.Pattern_3D.coords["Theta"].values)
-        phi_rad = np.radians(self.Pattern_3D.coords["Phi"].values)
-        theta_grid, phi_grid = np.meshgrid(theta_rad, phi_rad, indexing="ij")
-        r = self.Pattern_3D[component_name].values
-        r_clipped = np.clip(r, db_floor, r.max())
-        r_clipped -= r_clipped.min()
-        X = r_clipped * np.sin(theta_grid) * np.cos(phi_grid)
-        Y = r_clipped * np.sin(theta_grid) * np.sin(phi_grid)
-        Z = r_clipped * np.cos(theta_grid)
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Surface(
-                x=X,
-                y=Y,
-                z=Z,
-                surfacecolor=r,
-                colorscale="turbo",
-                cmin=db_floor,
-                cmax=0,
-                colorbar={"title": component_name, "thickness": 9},
-            )
+        fig = build_polar_3d(
+            self.Pattern_3D,
+            title=Path(self.data_filepath).name,
+            component_name=component_name,
+            db_floor=db_floor,
+            show_axes_arrows=show_axes_arrows,
         )
-        fig.update_layout(
-            title={
-                "text": os.path.basename(self.data_filepath),
-                "x": 0.5,
-                "y": 0.93,
-                "yanchor": "bottom",
-                "font": {"size": 16},
-            },
-            height=650,
-            margin={"t": 50, "l": 0, "r": 0, "b": 0},
-            scene={
-                "aspectmode": "data",
-                "xaxis_title": "x",
-                "yaxis_title": "y",
-                "zaxis_title": "z",
-            },
-        )
-        if show_axes_arrows:
-            L = r_clipped.max() + 6
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[0, L],
-                    y=[0, 0],
-                    z=[0, 0],
-                    mode="lines",
-                    line={"color": "black", "width": 6},
-                    showlegend=False,
-                    hoverinfo="skip",
-                    hovertemplate=None,
-                )
-            )
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[0, 0],
-                    y=[0, L / 2],
-                    z=[0, 0],
-                    mode="lines",
-                    line={"color": "black", "width": 6},
-                    showlegend=False,
-                    hoverinfo="skip",
-                    hovertemplate=None,
-                )
-            )
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[0, 0],
-                    y=[0, 0],
-                    z=[0, L / 2],
-                    mode="lines",
-                    line={"color": "black", "width": 6},
-                    showlegend=False,
-                    hoverinfo="skip",
-                    hovertemplate=None,
-                )
-            )
-            fig.add_trace(
-                go.Cone(
-                    x=[L, 0, 0],
-                    y=[0, L / 2, 0],
-                    z=[0, 0, L / 2],
-                    u=[4, 0, 0],
-                    v=[0, 4, 0],
-                    w=[0, 0, 4],
-                    anchor="tail",
-                    showscale=False,
-                    autocolorscale=False,
-                    sizemode="absolute",
-                    sizeref=0.3,
-                    colorscale=[[0, "black"], [1, "black"]],
-                    showlegend=False,
-                    hoverinfo="skip",
-                    hovertemplate=None,
-                )
-            )
         if show_fig:
             fig.show()
             return None
