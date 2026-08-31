@@ -61,6 +61,10 @@ mypy = "^1.16.0"
 pre-commit = "^4.2.0"
 pytest = "^8.0"
 jupyterlab = "^4.6.2"
+matplotlib = "^3.10.0"
+pytest-mpl = "^0.17.0"
+pytest-cov = "^7.0.0"
+scipy = "^1.14"
 
 [tool.poetry.group.typing.dependencies]
 pandas-stubs = "2.2.2.240909"
@@ -143,6 +147,9 @@ ignore = [
 "src/eas_3d_pattern/parser.py" = [
     "D102", # Missing docstring in public method (very common for test methods)
 ]
+"tests/**" = [
+    "D102", # Test method names are self-documenting; class docstrings cover intent
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -160,6 +167,9 @@ docstring-code-format = true
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "image: compares a rendered figure against a PNG baseline; deselect with -m 'not image' if a runner's renderer differs",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

@@ -338,11 +338,11 @@ class AntennaPattern:
         return float(self.raw_data["Front_to_Back"])
 
     @property
-    def phi_eletrical_pan(self) -> float | None:
+    def phi_electrical_pan(self) -> float | None:
         return self.raw_data.get("Phi_Electrical_Pan")
 
     @property
-    def theta_eletrical_tilt(self) -> float | None:
+    def theta_electrical_tilt(self) -> float | None:
         return self.raw_data.get("Theta_Electrical_Tilt")
 
     @property
@@ -713,7 +713,7 @@ class AntennaPattern:
                 raise ValueError(
                     "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
                 )
-            phi_nominal = self.phi_eletrical_pan or 0.0
+            phi_nominal = self.phi_electrical_pan or 0.0
             return SectorDefinition.from_preset(
                 "ngmn-v13-type-a",
                 theta_beam_peak=theta_peak,
@@ -960,7 +960,7 @@ class AntennaPattern:
 
 
         Returns:
-            None | go.Figure: None if show_fig is False else go.Figure
+            go.Figure | None: The figure if show_fig is False, otherwise None (the figure is displayed instead).
 
         """
         if component_name not in self.Pattern_3D.data_vars:
@@ -1047,7 +1047,7 @@ class AntennaPattern:
         db_floor: float = -30.0,
         show_axes_arrows: bool = True,
         show_fig: bool = True,
-    ) -> None | go.Figure:
+    ) -> go.Figure | None:
         """Plots the radiation pattern as 3D polar plot.
 
         Plots with plotly the radiation pattern as 3D polar plot.
@@ -1060,7 +1060,7 @@ class AntennaPattern:
             show_fig (bool, optional): Whether to show the figure. Defaults to True.
 
         Returns:
-            None | go.Figure: None if show_fig is False else go.Figure
+            go.Figure | None: The figure if show_fig is False, otherwise None (the figure is displayed instead).
 
         """
         if component_name not in self.Pattern_3D.data_vars:
@@ -1198,8 +1198,8 @@ class AntennaPattern:
             "==== Frequency & Tilt ====",
             f"  Frequency [Hz]: {self.frequency_hz if self.frequency_hz is not None else 'N/A'}",
             f"  Frequency Range [Hz]: {self.frequency_range if self.frequency_range is not None else 'N/A'}",
-            f"  Theta Electrical Tilt [deg]: {self.theta_eletrical_tilt if self.theta_eletrical_tilt is not None else 'N/A'}",
-            f"  Phi Electrical Pan [deg]: {self.phi_eletrical_pan if self.phi_eletrical_pan is not None else 'N/A'}",
+            f"  Theta Electrical Tilt [deg]: {self.theta_electrical_tilt if self.theta_electrical_tilt is not None else 'N/A'}",
+            f"  Phi Electrical Pan [deg]: {self.phi_electrical_pan if self.phi_electrical_pan is not None else 'N/A'}",
             "==== Dataset Info ====",
             f"  Theta Sampling Range: {[float(np.min(self.theta_sampling)), float(np.max(self.theta_sampling))] if self.theta_sampling is not None else 'N/A'}",
             f"  Phi Sampling Range: {[float(np.min(self.phi_sampling)), float(np.max(self.phi_sampling))] if self.phi_sampling is not None else 'N/A'}",
