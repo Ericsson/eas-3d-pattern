@@ -6,22 +6,17 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 import xarray as xr
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
+from eas_3d_pattern._processing import PatternProcessing
 from eas_3d_pattern.metrics import (
     beam_efficiency,
     directivity,
     find_peak,
     losses,
     top_3db_border,
-)
-from eas_3d_pattern.ngmn import Metadata
-from eas_3d_pattern.ngmn.coordinates import (
-    DEFAULT_INTERNAL_COORD_SYSTEM,
-    to_internal_frame,
 )
 from eas_3d_pattern.ngmn.loader import (
     load_json_file,
@@ -34,7 +29,7 @@ from eas_3d_pattern.sector_definitions import SectorDefinition
 logger = logging.getLogger(__name__)
 
 
-class AntennaPattern(Metadata):
+class AntennaPattern(PatternProcessing):
     """Antenna pattern class to read, calculate and visualize JSON antenna pattern data.
 
     Initializes the AntennaPattern object by loading and validating (default False) the antenna pattern data against the NGMN JSON schema.
@@ -131,117 +126,6 @@ class AntennaPattern(Metadata):
             ['eas', 'ngmn-v13-type-a']
         """
         return SectorDefinition.presets()
-
-    def _process_pattern_data(self) -> xr.Dataset:
-        """Process the raw data during __init__.
-
-        Processes the JSON antenna pattern data into the a standardized format to use methods like plotting or beam efficiency calculations.
-        """
-        if (
-            self.is_uniform_sampling
-            and self.theta_sampling is not None
-            and self.phi_sampling is not None
-        ):
-            X, Y = np.meshgrid(self.theta_sampling, self.phi_sampling, indexing="ij")
-            coords = np.column_stack([X.ravel(order="C"), Y.ravel(order="C")])
-            pattern_data = self.raw_pattern_dataframe
-            if len(pattern_data) != len(coords):
-                logging.error(
-                    f"Number of sampling points n={len(coords)} does not equal pattern data m={len(pattern_data)}. Could not construct dataframe."
-                )
-                raise ValueError(
-                    f"Number of sampling points n={len(coords)} does not equal pattern data m={len(pattern_data)}. Could not construct dataframe."
-                )
-            pattern_data = pd.concat(
-                [pd.DataFrame(coords, columns=["Theta", "Phi"]), pattern_data], axis=1
-            )
-        elif not self.is_uniform_sampling:
-            pattern_data = self.raw_pattern_dataframe
-        else:
-            logging.error("AntennaPattern: No uniform or nonuniform sampling detected.")
-            raise ValueError(
-                "AntennaPattern: No uniform or nonuniform sampling detected."
-            )
-
-        # construct the dataset
-        component_columns = [
-            "MagAttenuationTP",
-            "MagAttenuationCo",
-            "MagAttenuationCr",
-            "PhaseCo",
-            "PhaseCr",
-        ]
-
-        for field_name in component_columns:
-            if field_name not in pattern_data.columns:
-                pattern_data[field_name] = np.nan
-        pattern_data["P_co_dB"] = -pattern_data["MagAttenuationCo"]
-        pattern_data["P_cr_dB"] = -pattern_data["MagAttenuationCr"]
-        pattern_data["P_co_lin"] = 10 ** (pattern_data["P_co_dB"] / 10)
-        pattern_data["P_cr_lin"] = 10 ** (pattern_data["P_cr_dB"] / 10)
-        pattern_data["Phase_co_rad"] = np.deg2rad(pattern_data["PhaseCo"])
-        pattern_data["Phase_cr_rad"] = np.deg2rad(pattern_data["PhaseCr"])
-        if pattern_data["Phase_co_rad"].isna().any():
-            pattern_data["Phase_co_rad"] = np.zeros(pattern_data["Phase_co_rad"].shape)
-        if pattern_data["Phase_cr_rad"].isna().any():
-            pattern_data["Phase_cr_rad"] = np.zeros(pattern_data["Phase_cr_rad"].shape)
-
-        pattern_data["E_co_complex"] = np.sqrt(pattern_data["P_co_lin"]) * np.exp(
-            1j * pattern_data["Phase_co_rad"]
-        )  # complex number
-        pattern_data["E_cr_complex"] = np.sqrt(pattern_data["P_cr_lin"]) * np.exp(
-            1j * pattern_data["Phase_cr_rad"]
-        )  # complex number
-
-        if pattern_data["MagAttenuationTP"].isna().any():
-            logger.debug(
-                "AntennaPattern: TP component is NaN. Using Co and Cr components instead to construct TP."
-            )
-            pattern_data["P_tp_lin"] = np.square(
-                np.abs(pattern_data["E_co_complex"])
-            ) + np.square(np.abs(pattern_data["E_cr_complex"]))
-            pattern_data["P_tp_dB"] = 10 * np.log10(pattern_data["P_tp_lin"])
-        else:
-            pattern_data["P_tp_dB"] = -pattern_data["MagAttenuationTP"]
-            pattern_data["P_tp_lin"] = 10 ** (pattern_data["P_tp_dB"] / 10)
-
-        # assign index and coordinates
-        pattern_data = pattern_data.set_index(["Theta", "Phi"])
-        if pattern_data.index.duplicated().any():
-            logger.error(
-                "AntennaPattern: Duplicate (Theta, Phi) coordinate pairs found."
-            )
-            raise ValueError(
-                "AntennaPattern: Duplicate (Theta, Phi) coordinate pairs found."
-            )
-        df = pattern_data.to_xarray()
-        df = df.assign_attrs(
-            gain_dbi=self.gain_dbi,
-            phi_hpbw=self.phi_hpbw,
-            theta_hpbw=self.theta_hpbw,
-            front_to_back=self.front_to_back,
-            coordinate_system=self.coordinate_system,
-        )
-
-        # coordinate system and grid
-        if self.coordinate_system != DEFAULT_INTERNAL_COORD_SYSTEM:
-            logger.warning(
-                f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'Pattern_3D' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
-            )
-            df = to_internal_frame(
-                df, self.coordinate_system, DEFAULT_INTERNAL_COORD_SYSTEM
-            )
-        dTheta = np.diff(df["Theta"])
-        dPhi = np.diff(df["Phi"])
-        if len(np.unique(dTheta)) != 1:
-            logger.warning(
-                "AntennaPattern: Non-uniform gridded data detected in Theta. Calculations might misbehave."
-            )
-        if len(np.unique(dPhi)) != 1:
-            logger.warning(
-                "AntennaPattern: Non-unfirom gridded data detected in Phi. Calculations might misbehave."
-            )
-        return df
 
     def get_metadata_dict(self) -> dict[str, Any]:
         """Get meta data dictionary of the antenna pattern data.
