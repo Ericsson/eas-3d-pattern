@@ -8,15 +8,15 @@ parser normalizes known variants on load via the module-level ALTERNATIVES map.
 from __future__ import annotations
 
 from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.ngmn.loader import normalize_keys
 
 
 def _normalize(data: dict) -> dict:
-    """Call ``_normalize_json`` in isolation.
+    """Call the key-normalization helper directly.
 
-    The method does not use ``self``, so it can be invoked unbound for a fast,
-    construction-free unit test of the mapping logic.
+    It is a pure function over the payload, so it needs no ``AntennaPattern``.
     """
-    return AntennaPattern._normalize_json(None, data)  # type: ignore[arg-type]
+    return normalize_keys(data)
 
 
 def test_canonical_key_passes_through_unchanged():

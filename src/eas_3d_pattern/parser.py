@@ -1,5 +1,4 @@
 import io
-import json
 import logging
 import os
 import re
@@ -10,7 +9,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import xarray as xr
-from jsonschema import ValidationError, validate
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
 from eas_3d_pattern.metrics import (
@@ -25,19 +23,15 @@ from eas_3d_pattern.ngmn.coordinates import (
     DEFAULT_INTERNAL_COORD_SYSTEM,
     to_internal_frame,
 )
+from eas_3d_pattern.ngmn.loader import (
+    load_json_file,
+    normalize_keys,
+    validate_against_schema,
+)
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import SectorDefinition
 
 logger = logging.getLogger(__name__)
-
-# Maps vendor-specific variant -> canonical key
-ALTERNATIVES: dict[str, str] = {
-    # "Theta_Tilt" comes from the NGMN whitepaper:
-    # https://www.ngmn.org/wp-content/uploads/NGMN_BASTA_Recommendations-for-Base-Station-Antennas_V13.0.pdf
-    # "Theta_Electrical_Tilt" comes from the latest JSON Schema:
-    # https://www.ngmn.org/schema/basta/NGMN_BASTA_AA_3drp_JSON_Schema_WP3_0_latest.json
-    "Theta_Tilt": "Theta_Electrical_Tilt",
-}
 
 
 class AntennaPattern(Metadata):
@@ -73,9 +67,7 @@ class AntennaPattern(Metadata):
             raise FileNotFoundError(f"Data file not found: {data_filepath}")
         self.data_filepath: str = data_filepath
         self._schema: dict[str, Any] | None = NGMNSchema.schema_content
-        self.raw_data: dict[str, Any] = self._normalize_json(
-            self._load_data_from_file(data_filepath)
-        )
+        self.raw_data: dict[str, Any] = normalize_keys(load_json_file(data_filepath))
         if not self.raw_data.get("Data_Set"):
             logger.error(
                 f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
@@ -91,73 +83,16 @@ class AntennaPattern(Metadata):
                 raise ValueError(
                     "AntennaPattern: Validation requested but no schema is available."
                 )
-            self._validate_data_against_schema(self.raw_data, self._schema)
+            validate_against_schema(
+                self.raw_data,
+                self._schema,
+                self.data_filepath,
+                NGMNSchema.source_message,
+            )
 
         # ---- Process the pattern data into one normalized format ----
         self._sector_preset: str = "eas"
         self.Pattern_3D: xr.Dataset = self._process_pattern_data()
-
-    def _load_data_from_file(self, filepath: str) -> dict[str, Any]:
-        logger.debug(f"AntennaPattern: Loading user data from: {filepath}")
-        try:
-            with open(filepath, encoding="utf-8") as f:
-                return json.load(f)  # type: ignore[no-any-return]
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in user data file {filepath}: {e}")
-            raise ValueError(f"Invalid JSON in user data file {filepath}: {e}") from e
-        except OSError as e:
-            logger.error(f"Could not read user data file {filepath}: {e}")
-            raise OSError(f"Could not read user data file {filepath}: {e}") from e
-
-    def _normalize_json(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Normalize vendor-specific keys to canonical names.
-
-        Some vendors use non-standard key names in their 3drp JSON files.
-        This method replaces known variants with the canonical key defined
-        in the latest NGMN BASTA JSON schema, using the module-level
-        ALTERNATIVES mapping.
-
-        The canonical key is only set if it is not already present in the data,
-        preventing accidental overwrites when both keys coexist.
-
-        Example:
-            A file using the `NGMN whitepaper
-            <https://www.ngmn.org/wp-content/uploads/NGMN_BASTA_Recommendations-for-Base-Station-Antennas_V13.0.pdf>`_ naming::
-
-                {"Theta_Tilt": 6.0, ...}
-
-            Is normalized to the current `JSON schema
-            <https://www.ngmn.org/schema/basta/NGMN_BASTA_AA_3drp_JSON_Schema_WP3_0_latest.json>`_ naming::
-
-                {"Theta_Electrical_Tilt": 6.0, ...}
-
-        Args:
-            data: Raw dictionary loaded from a JSON antenna pattern file.
-
-        Returns:
-            The same dictionary with variant keys replaced by their canonical equivalents.
-        """
-        for variant, canonical in ALTERNATIVES.items():
-            if variant in data and canonical not in data:
-                data[canonical] = data.pop(variant)
-        return data
-
-    def _validate_data_against_schema(
-        self, data_instance: dict[str, Any], schema_instance: dict[str, Any]
-    ) -> None:
-        logger.debug(
-            f"AntennaPattern: Validating user data against schema: '{NGMNSchema.source_message}'..."
-        )
-        try:
-            validate(instance=data_instance, schema=schema_instance)
-            logger.debug("AntennaPattern: User data validation successful.")
-        except ValidationError as e:
-            error_path_str = (
-                " -> ".join(map(str, e.path)) if e.path else "document root"
-            )
-            full_error_message = f"Antenna data validation FAILED for '{self.data_filepath}'.\nSchema source: '{NGMNSchema.source_message}'.\nError at data path: '{error_path_str}'.\nValidation Message: {e.message} (Validator: '{e.validator}')"
-            logger.error(full_error_message)
-            raise ValidationError(full_error_message) from e
 
     @property
     def sector_preset(self) -> str:
