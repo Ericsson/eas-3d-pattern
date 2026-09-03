@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `go.Figure | None` (was `None | go.Figure`). No behavioural change.
 - Reworded a `calculate_directivity()` docstring note for clarity.
 
+### Deprecated
+
+- `AntennaPattern.is_nonuniform_sampling` now emits a `DeprecationWarning` and is
+  scheduled for removal in a future release. It is exactly the negation of
+  `is_uniform_sampling`; use `not pattern.is_uniform_sampling` instead.
+
 ### Fixed
 
 - Corrected the `Returns:` docstring on `plot()` and `plot_3D()`, which described the

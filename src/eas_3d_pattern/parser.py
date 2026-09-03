@@ -33,8 +33,6 @@ EXPECTED_COORDINATE_SYSTEMS = [
 ]
 DEFAULT_INTERNAL_COORD_SYSTEM = "SPCS_Ericsson"
 
-epsilon = 1e-6
-
 # Maps vendor-specific variant -> canonical key
 ALTERNATIVES: dict[str, str] = {
     # "Theta_Tilt" comes from the NGMN whitepaper:
@@ -213,45 +211,6 @@ class AntennaPattern(Metadata):
             ['eas', 'ngmn-v13-type-a']
         """
         return SectorDefinition.presets()
-
-    @property
-    def theta_sampling(self) -> np.ndarray | None:
-        theta_sampling_list = self.raw_data.get("Theta_Sampling")
-        if not theta_sampling_list:
-            return None
-        return np.arange(
-            theta_sampling_list[0],
-            theta_sampling_list[2] + epsilon,
-            theta_sampling_list[1],
-        ).reshape(-1, 1)
-
-    @property
-    def phi_sampling(self) -> np.ndarray | None:
-        phi_sampling_list = self.raw_data.get("Phi_Sampling")
-        if not phi_sampling_list:
-            return None
-        return np.arange(
-            phi_sampling_list[0], phi_sampling_list[2] + epsilon, phi_sampling_list[1]
-        ).reshape(1, -1)
-
-    @property
-    def raw_pattern_dataframe(self) -> pd.DataFrame:
-        return pd.DataFrame(
-            self.raw_data["Data_Set"], columns=self.raw_data["Data_Set_Row_Structure"]
-        )
-
-    # ---- properties derived from JSON
-    @property
-    def is_uniform_sampling(self) -> bool:
-        return bool(
-            self.raw_data.get("Theta_Sampling") and self.raw_data.get("Phi_Sampling")
-        )
-
-    @property
-    def is_nonuniform_sampling(self) -> bool:
-        return not bool(
-            self.raw_data.get("Theta_Sampling") and self.raw_data.get("Phi_Sampling")
-        )
 
     def _process_pattern_data(self) -> xr.Dataset:
         """Process the raw data during __init__.

@@ -23,9 +23,15 @@ supplied at runtime by ``AntennaPattern.__init__``.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
+import pandas as pd
+
+# Small offset added to the inclusive stop of an NGMN [start, step, stop] sampling
+# triple so ``np.arange`` includes the final grid point despite float rounding.
+_SAMPLING_STOP_EPSILON = 1e-6
 
 
 class Metadata:
@@ -244,3 +250,57 @@ class Metadata:
     def optional_comments(self) -> str:
         """Free-text comments field from the source data."""
         return str(self.raw_data["Optional_Comments"])
+
+    @property
+    def theta_sampling(self) -> np.ndarray | None:
+        """Theta grid as a column vector, or ``None`` for non-uniform sampling."""
+        theta_sampling_list = self.raw_data.get("Theta_Sampling")
+        if not theta_sampling_list:
+            return None
+        return np.arange(
+            theta_sampling_list[0],
+            theta_sampling_list[2] + _SAMPLING_STOP_EPSILON,
+            theta_sampling_list[1],
+        ).reshape(-1, 1)
+
+    @property
+    def phi_sampling(self) -> np.ndarray | None:
+        """Phi grid as a row vector, or ``None`` for non-uniform sampling."""
+        phi_sampling_list = self.raw_data.get("Phi_Sampling")
+        if not phi_sampling_list:
+            return None
+        return np.arange(
+            phi_sampling_list[0],
+            phi_sampling_list[2] + _SAMPLING_STOP_EPSILON,
+            phi_sampling_list[1],
+        ).reshape(1, -1)
+
+    @property
+    def raw_pattern_dataframe(self) -> pd.DataFrame:
+        """Raw ``Data_Set`` as a DataFrame with the declared row-structure columns."""
+        return pd.DataFrame(
+            self.raw_data["Data_Set"], columns=self.raw_data["Data_Set_Row_Structure"]
+        )
+
+    @property
+    def is_uniform_sampling(self) -> bool:
+        """True when both Theta and Phi sampling triples are present."""
+        return bool(
+            self.raw_data.get("Theta_Sampling") and self.raw_data.get("Phi_Sampling")
+        )
+
+    @property
+    def is_nonuniform_sampling(self) -> bool:
+        """Negation of :attr:`is_uniform_sampling`.
+
+        .. deprecated::
+            Redundant with ``not is_uniform_sampling``; scheduled for removal in a
+            future release. Use ``not pattern.is_uniform_sampling`` instead.
+        """
+        warnings.warn(
+            "is_nonuniform_sampling is deprecated and will be removed in a future "
+            "release; use 'not is_uniform_sampling' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return not self.is_uniform_sampling
