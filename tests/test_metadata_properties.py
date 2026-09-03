@@ -11,6 +11,8 @@ These pin behaviour ahead of the planned god-class decomposition.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from eas_3d_pattern import AntennaPattern
@@ -177,3 +179,70 @@ class TestRequiredMetadata:
     def test_present_required_key_is_returned(self, pattern_path):
         pattern = load(pattern_path, Supplier="VENDOR")
         assert pattern.supplier == "VENDOR"
+
+
+class TestPassThroughMetadata:
+    """Verbatim string/scalar pass-throughs return exactly what is in the JSON.
+
+    These accessors were moved to ``eas_3d_pattern.ngmn.Metadata`` in the Phase 2a
+    decomposition. Several were previously only *executed* via ``__str__`` without
+    their return value being asserted, and two (``BASTA_AA_WP_version``,
+    ``coordinate_system``) had no coverage at all. This pins the value contract so
+    a wrong JSON key or a botched future move is caught.
+    """
+
+    # (property name, JSON key, stored value)
+    STRING_PASS_THROUGHS: ClassVar = [
+        ("BASTA_AA_WP_version", "BASTA_AA_WP_version", "WP3.0"),
+        ("supplier", "Supplier", "VENDOR"),
+        ("antenna_model", "Antenna_Model", "ANTMODEL1"),
+        ("antenna_type", "Antenna_Type", "Massive MIMO"),
+        ("revision_version", "Revision_Version", "R2"),
+        ("released_date", "Released_Date", "2026-01-01"),
+        ("coordinate_system", "Coordinate_System", "SPCS_Ericsson"),
+        ("pattern_type", "Pattern_Type", "3D"),
+        ("nominal_polarization", "Nominal_Polarization", "+45/-45"),
+        ("optional_comments", "Optional_Comments", "sample comment"),
+    ]
+
+    @pytest.mark.parametrize(
+        ("prop", "key", "value"),
+        STRING_PASS_THROUGHS,
+        ids=[row[0] for row in STRING_PASS_THROUGHS],
+    )
+    def test_string_pass_through_returns_stored_value(
+        self, pattern_path, prop, key, value
+    ):
+        pattern = load(pattern_path, **{key: value})
+        assert getattr(pattern, prop) == value
+
+    # (property name, JSON key, stored value, expected float)
+    SCALAR_PASS_THROUGHS: ClassVar = [
+        ("phi_hpbw", "Phi_HPBW", 65.0, 65.0),
+        ("theta_hpbw", "Theta_HPBW", 7.0, 7.0),
+        ("front_to_back", "Front_to_Back", 30.0, 30.0),
+    ]
+
+    @pytest.mark.parametrize(
+        ("prop", "key", "value", "expected"),
+        SCALAR_PASS_THROUGHS,
+        ids=[row[0] for row in SCALAR_PASS_THROUGHS],
+    )
+    def test_scalar_pass_through_is_float(
+        self, pattern_path, prop, key, value, expected
+    ):
+        pattern = load(pattern_path, **{key: value})
+        result = getattr(pattern, prop)
+        assert isinstance(result, float)
+        assert result == pytest.approx(expected)
+
+    def test_optional_string_present_value_is_returned(self, pattern_path):
+        pattern = load(
+            pattern_path,
+            Configuration="cfgA",
+            Array_ID="A1",
+            Array_Position="top",
+        )
+        assert pattern.configuration == "cfgA"
+        assert pattern.array_id == "A1"
+        assert pattern.array_position == "top"

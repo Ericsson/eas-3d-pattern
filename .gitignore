@@ -184,3 +184,4 @@ plan.md
 # transient artifacts from baseline image comparison (tests/test_plot.py)
 tests/fixtures/*-actual.png
 tests/fixtures/*-failed-diff.png
+.trash/

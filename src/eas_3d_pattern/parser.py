@@ -14,6 +14,7 @@ import xarray as xr
 from jsonschema import ValidationError, validate
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
+from eas_3d_pattern.ngmn import Metadata
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import (
     BoundaryBoxSquare,
@@ -56,7 +57,7 @@ _TO_ERICSSON = {
 }
 
 
-class AntennaPattern:
+class AntennaPattern(Metadata):
     """Antenna pattern class to read, calculate and visualize JSON antenna pattern data.
 
     Initializes the AntennaPattern object by loading and validating (default False) the antenna pattern data against the NGMN JSON schema.
@@ -176,46 +177,6 @@ class AntennaPattern:
             raise ValidationError(full_error_message) from e
 
     @property
-    def BASTA_AA_WP_version(self) -> str:
-        return str(self.raw_data["BASTA_AA_WP_version"])
-
-    @property
-    def supplier(self) -> str:
-        return str(self.raw_data["Supplier"])
-
-    @property
-    def antenna_model(self) -> str:
-        return str(self.raw_data["Antenna_Model"])
-
-    @property
-    def antenna_type(self) -> str:
-        return str(self.raw_data["Antenna_Type"])
-
-    @property
-    def revision_version(self) -> str:
-        return str(self.raw_data["Revision_Version"])
-
-    @property
-    def released_date(self) -> str:
-        return str(self.raw_data["Released_Date"])
-
-    @property
-    def coordinate_system(self) -> str:
-        return str(self.raw_data["Coordinate_System"])
-
-    @property
-    def pattern_name(self) -> str | None:
-        return self.raw_data.get("Pattern_Name")
-
-    @property
-    def beam_id(self) -> str | None:
-        return self.raw_data.get("Beam_ID")
-
-    @property
-    def pattern_type(self) -> str:
-        return str(self.raw_data["Pattern_Type"])
-
-    @property
     def frequency_hz(self) -> float:
         freq_dict = self.raw_data["Frequency"]
         val = float(freq_dict.get("value"))
@@ -310,50 +271,6 @@ class AntennaPattern:
                 return val + 2.15
             case _:
                 return val
-
-    @property
-    def configuration(self) -> str | None:
-        return self.raw_data.get("Configuration")
-
-    @property
-    def rf_port(self) -> str | None:
-        return self.raw_data.get("RF_Port")
-
-    @property
-    def array_id(self) -> str | None:
-        return self.raw_data.get("Array_ID")
-
-    @property
-    def array_position(self) -> str | None:
-        return self.raw_data.get("Array_Position")
-
-    @property
-    def phi_hpbw(self) -> float:
-        return float(self.raw_data["Phi_HPBW"])
-
-    @property
-    def theta_hpbw(self) -> float:
-        return float(self.raw_data["Theta_HPBW"])
-
-    @property
-    def front_to_back(self) -> float:
-        return float(self.raw_data["Front_to_Back"])
-
-    @property
-    def phi_electrical_pan(self) -> float | None:
-        return self.raw_data.get("Phi_Electrical_Pan")
-
-    @property
-    def theta_electrical_tilt(self) -> float | None:
-        return self.raw_data.get("Theta_Electrical_Tilt")
-
-    @property
-    def nominal_polarization(self) -> str:
-        return str(self.raw_data["Nominal_Polarization"])
-
-    @property
-    def optional_comments(self) -> str:
-        return str(self.raw_data["Optional_Comments"])
 
     @property
     def sector_preset(self) -> str:
