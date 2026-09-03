@@ -14,7 +14,13 @@ import xarray as xr
 from jsonschema import ValidationError, validate
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
-from eas_3d_pattern.metrics import directivity, ensure_domega, losses
+from eas_3d_pattern.metrics import (
+    directivity,
+    ensure_domega,
+    find_peak,
+    losses,
+    top_3db_border,
+)
 from eas_3d_pattern.ngmn import Metadata
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import (
@@ -596,54 +602,40 @@ class AntennaPattern(Metadata):
     def find_peak_coordinates(self, power: bool = False) -> tuple[float, float]:
         """Finds the peak coordinates of Theta/Phi of the antenna pattern data.
 
-        Searches for the maximum value within the pattern data array.
-        If two points represent a maximum value, the first one is returned.
+        Delegates the search to :func:`eas_3d_pattern.metrics.peak.find_peak` and
+        publishes the result on the dataset attrs.
 
         Args:
             power (bool, optional): Whether to search for peak of power or co-polarized component. Defaults to False.
 
+        Raises:
+            ValueError: If no peak coordinate pair could be determined.
+
         Returns:
             tuple[float, float]: (theta, phi) coordinates of the peak in degress.
-        """
-        if power:
-            logger.debug(
-                "AntennaPattern: Searching for peak of antenna pattern power component"
-            )
-            peak_tuple = (
-                self.Pattern_3D.stack(pt=("Theta", "Phi"))
-                .idxmax("pt")["P_tp_dB"]
-                .values.item()
-            )
-        else:
-            logger.debug(
-                "AntennaPattern: Searching for peak of antenna pattern co-poloarized component"
-            )
-            peak_tuple = (
-                self.Pattern_3D.stack(pt=("Theta", "Phi"))
-                .idxmax("pt")["P_co_dB"]
-                .values.item()
-            )
-        if not isinstance(peak_tuple, tuple):
-            logger.error(
-                "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data."
-            )
-            raise ValueError(
-                "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data."
-            )
-        theta_val_peak, phi_val_peak = peak_tuple
 
+        Note:
+            Publishes ``peak_coordinates`` on ``self.Pattern_3D.attrs``. The side
+            effect is deliberate and relied upon by ``util_func/report.py``.
+        """
+        peak = find_peak(self.Pattern_3D, power)
         # enrich attributes with peak
         self.Pattern_3D = self.Pattern_3D.assign_attrs(
-            peak_coordinates=peak_tuple,
+            peak_coordinates=peak,
         )
-        logger.debug(f"AntennaPattern: Peak coordinates found: {peak_tuple}")
-        return theta_val_peak, phi_val_peak
+        return peak
 
     def calculate_top_3db_point(self, power: bool = False) -> float:
         """Finds the Theta border for the top 3db point of the antenna pattern data.
 
+        Delegates to :func:`eas_3d_pattern.metrics.peak.top_3db_border`.
+
         Note:
             No interpolation done, simplistic search which finds the last point reported above -3dB.
+
+            Locating the peak goes through ``find_peak_coordinates()`` so that
+            ``peak_coordinates`` is published too — ``util_func/report.py`` calls only
+            this method and then reads that attribute.
 
         Args:
             power (bool, optional): Whether to search for peak of power or co-polarized component. Defaults to False, which complies with the NGMN standard.
@@ -652,33 +644,9 @@ class AntennaPattern(Metadata):
             float: Theta border for the top 3db point in degrees.
         """
         theta_val_peak, phi_val_peak = self.find_peak_coordinates(power)
-        vertical_cut = self.Pattern_3D.sel(Phi=phi_val_peak)
-        if power:
-            vertical_cut_normed = vertical_cut["P_tp_dB"]
-        else:
-            vertical_cut_normed = vertical_cut["P_co_dB"]
-        # Fallback: if no point at/below -3 dB exists above the peak (e.g. a very
-        # narrow beam peaking at the top of the cut), the 3 dB border collapses to
-        # the peak theta itself instead of leaving ``top_border`` unbound.
-        top_border = float(theta_val_peak)
-        # Advance the border by the actual theta grid step rather than a hardcoded
-        # 1 deg, so the result is correct for any sampling resolution.
-        theta_axis = np.sort(vertical_cut_normed["Theta"].values)
-        if theta_axis.size > 1:
-            grid_step = float(np.median(np.diff(theta_axis)))
-        else:
-            grid_step = 1.0
-        for theta_val in np.flip(
-            vertical_cut_normed.sel(Theta=slice(0, theta_val_peak))["Theta"]
-        ):
-            if vertical_cut_normed.sel(Theta=theta_val) <= -3:
-                top_border = float(theta_val.values) + grid_step
-                break
-        else:
-            logger.warning(
-                "AntennaPattern: No -3 dB crossing found above the peak; using peak theta as top 3 dB border."
-            )
-
+        top_border = top_3db_border(
+            self.Pattern_3D, theta_val_peak, phi_val_peak, power
+        )
         # enrich with top_3db_point
         self.Pattern_3D.attrs["top_3db_point"] = top_border
         return top_border
