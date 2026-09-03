@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 
 class Metadata:
     """Read-only NGMN BASTA metadata accessors over ``raw_data``.
@@ -86,6 +88,107 @@ class Metadata:
     def pattern_type(self) -> str:
         """Pattern type designation."""
         return str(self.raw_data["Pattern_Type"])
+
+    @property
+    def frequency_hz(self) -> float:
+        """Operating frequency normalized to hertz from any declared unit."""
+        freq_dict = self.raw_data["Frequency"]
+        val = float(freq_dict.get("value"))
+        unit = freq_dict.get("unit", "")
+        match unit:
+            case "Hz":
+                return val
+            case "kHz":
+                return val * 1e3
+            case "MHz":
+                return val * 1e6
+            case "GHz":
+                return val * 1e9
+            case "THz":
+                return val * 1e12
+            case _:
+                return val
+
+    @property
+    def frequency_range(self) -> list[float] | None:
+        """Frequency bounds ``[lower, upper]`` in hertz, or ``None`` if absent."""
+        freq_range_dict = self.raw_data.get("Frequency_Range")
+        if not freq_range_dict:
+            return None
+        freq_range_list = [
+            float(freq_range_dict.get("lower")),
+            float(freq_range_dict.get("upper")),
+        ]
+        unit = freq_range_dict.get("unit", "")
+        match unit:
+            case "Hz":
+                return freq_range_list
+            case "kHz":
+                return [v * 1e3 for v in freq_range_list]
+            case "MHz":
+                return [v * 1e6 for v in freq_range_list]
+            case "GHz":
+                return [v * 1e9 for v in freq_range_list]
+            case "THz":
+                return [v * 1e12 for v in freq_range_list]
+            case _:
+                return freq_range_list
+
+    @property
+    def eirp_dbm(self) -> float | None:
+        """EIRP normalized to dBm from any declared power unit, or ``None``."""
+        EIRP_dict = self.raw_data.get("EIRP")
+        if not EIRP_dict:
+            return None
+        val = float(EIRP_dict.get("value"))
+        unit = EIRP_dict.get("unit", "")
+        match unit:
+            case "mW":
+                return float(10 * np.log10(val))
+            case "W":
+                return float(10 * np.log10(val * 1000))
+            case "dBW":
+                return float(val + 30)
+            case "dBm":
+                return val
+            case _:
+                return val
+
+    @property
+    def output_power_watt(self) -> float | None:
+        """Configured output power normalized to watts, or ``None`` if absent."""
+        configured_output_power = self.raw_data.get("Configured_Output_Power")
+        if not configured_output_power:
+            return None
+        val = float(configured_output_power.get("value"))
+        unit = configured_output_power.get("unit", "")
+        match unit:
+            case "mW":
+                return val / 1000.0
+            case "W":
+                return val
+            case "dBW":
+                return float(np.pow(10, val / 10.0))
+            case "dBm":
+                return float(np.pow(10, val / 10.0) / 1000.0)
+            case _:
+                return val
+
+    @property
+    def gain_dbi(self) -> float | None:
+        """Antenna gain in dBi (dBd converted with +2.15), or ``None`` if absent."""
+        gain_dict = self.raw_data.get("Gain")
+        if not gain_dict:
+            return None
+        val = float(gain_dict.get("value"))
+        unit = gain_dict.get("unit", "")
+        match unit:
+            case "dBi":
+                return val
+            case "dBd":
+                return val + 2.15
+            case _:
+                return val
 
     @property
     def configuration(self) -> str | None:
