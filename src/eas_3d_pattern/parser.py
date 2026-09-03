@@ -14,6 +14,7 @@ import xarray as xr
 from jsonschema import ValidationError, validate
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
+from eas_3d_pattern.metrics import directivity, ensure_domega, losses
 from eas_3d_pattern.ngmn import Metadata
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import (
@@ -400,45 +401,20 @@ class AntennaPattern(Metadata):
     def _ensure_domega(self) -> None:
         """Ensure the solid-angle weight ``dOmega`` exists on ``Pattern_3D``.
 
-        Computes ``dOmega = sin(theta) * dTheta * dPhi`` and injects it as a data variable,
-        which is what turns a plain sum over grid points into a solid-angle-weighted
-        integral over the sphere. No-op if it is already present, so the cost is paid once
-        per pattern.
-
-        ``np.gradient`` is applied to the coordinate arrays themselves, so it yields the
-        local spacing at each point and therefore handles unevenly spaced grids as well as
-        regular ones.
+        Thin wrapper over :func:`eas_3d_pattern.metrics.ensure_domega`.
 
         Note:
             This mutates ``self.Pattern_3D`` in place. The side effect is deliberate and
             relied upon as a cache by ``calculate_directivity()`` and
             ``calculate_beam_efficiency()``.
         """
-        if "dOmega" in self.Pattern_3D.data_vars:
-            return
-
-        weight = np.repeat(
-            np.sin(np.deg2rad(self.Pattern_3D.Theta.values)).T[:, None],
-            len(self.Pattern_3D.Phi),
-            axis=1,
-        )
-        dTheta = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Theta"]))).reshape(
-            -1, 1
-        )
-        dPhi = np.abs(np.gradient(np.deg2rad(self.Pattern_3D["Phi"]))).reshape(1, -1)
-        self.Pattern_3D["dOmega"] = xr.DataArray(
-            weight * (dTheta * dPhi),
-            dims=("Theta", "Phi"),
-            coords={"Theta": self.Pattern_3D.Theta, "Phi": self.Pattern_3D.Phi},
-            name="dOmega",
-        )
+        ensure_domega(self.Pattern_3D)
 
     def calculate_directivity(self) -> float:
         """Calculate the directivity of the antenna pattern data.
 
         Directivity is calculated with the average radiation intensity over the whole sphere and the maximum radiation intensity.
         Can only be calculated if data is complete (full sphere). Regular grids are advised.
-        More advanced geometry calculation with something like Delaunay+Voronoi is not supported for now.
 
         Args:
             None
@@ -453,17 +429,7 @@ class AntennaPattern(Metadata):
             >>> directivity_dbi = antenna_pattern.calculate_directivity()
             >>> losses = gain_dbi - directivity_dbi
         """
-        logger.debug("AntennaPattern: Calculating directivity of antenna pattern data.")
-        self._ensure_domega()
-        Umax = float(self.Pattern_3D["P_tp_lin"].max())
-        Uavg = float(
-            (self.Pattern_3D["P_tp_lin"] * self.Pattern_3D["dOmega"]).sum(
-                ("Theta", "Phi")
-            )
-            / (self.Pattern_3D["dOmega"].sum())
-        )
-        directivity_dbi = float(10 * np.log10(Umax / Uavg))
-        return directivity_dbi
+        return directivity(self.Pattern_3D)
 
     def calculate_losses(self) -> float:
         """Calculate the losses of the antenna pattern data.
@@ -474,7 +440,7 @@ class AntennaPattern(Metadata):
             None
 
         Raises:
-            None
+            ValueError: If no 'Gain' is declared in the pattern metadata.
 
         Returns:
             float: The loss value in dB (gain - directivity).
@@ -482,12 +448,7 @@ class AntennaPattern(Metadata):
         Example:
             >>> losses = antenna_pattern.calculate_losses()
         """
-        logger.debug("AntennaPattern: Calculating losses of antenna pattern data.")
-        if self.gain_dbi is None:
-            raise ValueError(
-                "AntennaPattern: Loss can only be calculated if 'Gain' is available in the header"
-            )
-        return float(self.gain_dbi - self.calculate_directivity())
+        return losses(self.Pattern_3D, self.gain_dbi)
 
     def _build_sectors_from_preset(self) -> SectorDefinition:
         """Build a SectorDefinition from the active preset and pattern metadata.
