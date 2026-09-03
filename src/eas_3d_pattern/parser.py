@@ -238,7 +238,7 @@ class AntennaPattern(Metadata):
             pattern_data = pd.concat(
                 [pd.DataFrame(coords, columns=["Theta", "Phi"]), pattern_data], axis=1
             )
-        elif self.is_nonuniform_sampling:
+        elif not self.is_uniform_sampling:
             pattern_data = self.raw_pattern_dataframe
         else:
             logging.error("AntennaPattern: No uniform or nonuniform sampling detected.")
