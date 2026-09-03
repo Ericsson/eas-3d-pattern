@@ -21,11 +21,13 @@ still open.
 from __future__ import annotations
 
 from eas_3d_pattern.metrics.directivity import directivity, losses
+from eas_3d_pattern.metrics.efficiency import beam_efficiency
 from eas_3d_pattern.metrics.peak import find_peak, top_3db_border
 from eas_3d_pattern.metrics.quadrature import DOMEGA, ensure_domega
 
 __all__ = [
     "DOMEGA",
+    "beam_efficiency",
     "directivity",
     "ensure_domega",
     "find_peak",

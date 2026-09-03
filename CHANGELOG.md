@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `go.Figure | None` (was `None | go.Figure`). No behavioural change.
 - Reworded a `calculate_directivity()` docstring note for clarity.
 
+### Removed
+
+- The internal Ericsson document link from the `calculate_beam_efficiency()` docstring.
+  It pointed at an eridoc URL that external users cannot reach and exposed an internal
+  document identifier in a public repository. The EAS beam-efficiency methodology will be
+  documented publicly instead (plan section 12.1 / M5-5).
+
 ### Deprecated
 
 - `AntennaPattern.is_nonuniform_sampling` now emits a `DeprecationWarning` and is

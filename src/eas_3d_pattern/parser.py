@@ -1,7 +1,6 @@
 import io
 import json
 import logging
-import operator
 import os
 import re
 from pathlib import Path
@@ -15,18 +14,15 @@ from jsonschema import ValidationError, validate
 
 from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
 from eas_3d_pattern.metrics import (
+    beam_efficiency,
     directivity,
-    ensure_domega,
     find_peak,
     losses,
     top_3db_border,
 )
 from eas_3d_pattern.ngmn import Metadata
 from eas_3d_pattern.schema_manager import NGMNSchema
-from eas_3d_pattern.sector_definitions import (
-    BoundaryBoxSquare,
-    SectorDefinition,
-)
+from eas_3d_pattern.sector_definitions import SectorDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -404,18 +400,6 @@ class AntennaPattern(Metadata):
         metadata.pop("Data_Set_Row_Structure", None)
         return metadata
 
-    def _ensure_domega(self) -> None:
-        """Ensure the solid-angle weight ``dOmega`` exists on ``Pattern_3D``.
-
-        Thin wrapper over :func:`eas_3d_pattern.metrics.ensure_domega`.
-
-        Note:
-            This mutates ``self.Pattern_3D`` in place. The side effect is deliberate and
-            relied upon as a cache by ``calculate_directivity()`` and
-            ``calculate_beam_efficiency()``.
-        """
-        ensure_domega(self.Pattern_3D)
-
     def calculate_directivity(self) -> float:
         """Calculate the directivity of the antenna pattern data.
 
@@ -499,18 +483,19 @@ class AntennaPattern(Metadata):
         Beam efficiency is calculated as the ratio of the overall powersum to the sectors defined.
         Calculations are based only on the summation method for now.
 
+        Delegates the integration to
+        :func:`eas_3d_pattern.metrics.efficiency.beam_efficiency`.
+
         Args:
             sector_definitions (SectorDefinition, optional): Defaults to None. If None, the default sector definitions will be used.
             powersum (bool, optional): Defaults to True. If True, beam efficiency is calculated on total power. If False, beam efficiency is calculated on co-polar pattern.
 
         Raises:
+            ValueError: If the overall power sums to zero.
             TypeError: If sectors definitions are no BoundaryBoxSquare objects
 
         Returns:
             dict: A dictionary key value pair with the sector name as keys and the beam efficiency as values
-
-        Note:
-            Definitions and example of reporting can be found here: https://erilink.internal.ericsson.com/eridoc/erl/objectId/09004cffd60af4fb?docno=2%2F0363-KRE2014818%2F21&option=download&format=pdf
 
         Example:
             >>> antenna_pattern.calculate_beam_efficiency()  # default behavior
@@ -527,77 +512,9 @@ class AntennaPattern(Metadata):
             ...     sector_definitions=sector_defs, powersum=False
             ... )
         """
-        logger.debug(
-            "AntennaPattern: Calculating beam efficiency of antenna pattern data."
-        )
         if sector_definitions is None:
             sector_definitions = self._build_sectors_from_preset()
-
-        if powersum:
-            field_values = self.Pattern_3D["P_tp_lin"]
-        else:
-            field_values = self.Pattern_3D["P_co_lin"]
-
-        self._ensure_domega()
-
-        weighted_field_values = self.Pattern_3D["dOmega"] * field_values
-        Sp_overall = float(weighted_field_values.sum())
-        if Sp_overall == 0:
-            logger.error(
-                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
-            )
-            raise ValueError(
-                "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
-            )
-
-        operators_dict = {
-            "<": operator.lt,
-            "<=": operator.le,
-            ">": operator.gt,
-            ">=": operator.ge,
-        }
-        beam_efficiency = {}
-        for sector_name, sector_boundary_box in sector_definitions.sectors.items():
-            if isinstance(sector_boundary_box, BoundaryBoxSquare):
-                Sp_region = (
-                    weighted_field_values.where(
-                        operators_dict[sector_boundary_box.theta_min[1]](
-                            sector_boundary_box.theta_min[0],
-                            weighted_field_values.Theta,
-                        ),
-                        drop=True,
-                    )
-                    .where(
-                        operators_dict[sector_boundary_box.theta_max[1]](
-                            weighted_field_values.Theta,
-                            sector_boundary_box.theta_max[0],
-                        ),
-                        drop=True,
-                    )
-                    .where(
-                        operators_dict[sector_boundary_box.phi_min[1]](
-                            sector_boundary_box.phi_min[0], weighted_field_values.Phi
-                        ),
-                        drop=True,
-                    )
-                    .where(
-                        operators_dict[sector_boundary_box.phi_max[1]](
-                            weighted_field_values.Phi, sector_boundary_box.phi_max[0]
-                        ),
-                        drop=True,
-                    )
-                    .sum()
-                )
-                beam_efficiency[sector_name] = float(Sp_region / Sp_overall)
-            else:
-                logger.error(
-                    f"Sector Definitions need to be class 'BoundaryBoxSquare' but is class {type(sector_boundary_box)}."
-                )
-                raise TypeError(
-                    f"Sector Definitions need to be class 'BoundaryBoxSquare' but is class {type(sector_boundary_box)}."
-                )
-
-        return beam_efficiency
+        return beam_efficiency(self.Pattern_3D, sector_definitions, powersum)
 
     def find_peak_coordinates(self, power: bool = False) -> tuple[float, float]:
         """Finds the peak coordinates of Theta/Phi of the antenna pattern data.
