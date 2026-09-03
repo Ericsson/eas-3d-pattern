@@ -8,13 +8,23 @@
 # including the warranty disclaimer and redistribution conditions.
 """NGMN BASTA domain package.
 
-Groups code bound to the NGMN BASTA specification. Currently exposes the
-read-only :class:`Metadata` accessors; future NGMN concerns (schema handling,
-coordinate systems) can be added as sibling modules without further renames.
+Groups code bound to the NGMN BASTA specification: the read-only
+:class:`Metadata` accessors and the coordinate-system conversions in
+:mod:`~eas_3d_pattern.ngmn.coordinates`.
 """
 
 from __future__ import annotations
 
+from eas_3d_pattern.ngmn.coordinates import (
+    DEFAULT_INTERNAL_COORD_SYSTEM,
+    EXPECTED_COORDINATE_SYSTEMS,
+    to_internal_frame,
+)
 from eas_3d_pattern.ngmn.metadata import Metadata
 
-__all__ = ["Metadata"]
+__all__ = [
+    "DEFAULT_INTERNAL_COORD_SYSTEM",
+    "EXPECTED_COORDINATE_SYSTEMS",
+    "Metadata",
+    "to_internal_frame",
+]

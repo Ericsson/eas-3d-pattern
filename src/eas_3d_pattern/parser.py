@@ -21,20 +21,14 @@ from eas_3d_pattern.metrics import (
     top_3db_border,
 )
 from eas_3d_pattern.ngmn import Metadata
+from eas_3d_pattern.ngmn.coordinates import (
+    DEFAULT_INTERNAL_COORD_SYSTEM,
+    to_internal_frame,
+)
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import SectorDefinition
 
 logger = logging.getLogger(__name__)
-
-# Define a coordinate system to run calculations easier
-EXPECTED_COORDINATE_SYSTEMS = [
-    "SPCS_Polar",
-    "SPCS_CW",
-    "SPCS_CCW",
-    "SPCS_Geo",
-    "SPCS_Ericsson",
-]
-DEFAULT_INTERNAL_COORD_SYSTEM = "SPCS_Ericsson"
 
 # Maps vendor-specific variant -> canonical key
 ALTERNATIVES: dict[str, str] = {
@@ -43,18 +37,6 @@ ALTERNATIVES: dict[str, str] = {
     # "Theta_Electrical_Tilt" comes from the latest JSON Schema:
     # https://www.ngmn.org/schema/basta/NGMN_BASTA_AA_3drp_JSON_Schema_WP3_0_latest.json
     "Theta_Tilt": "Theta_Electrical_Tilt",
-}
-
-# Coordinate transforms into the internal SPCS_Ericsson frame.
-# Each entry maps (theta, phi) arrays -> (theta, phi) arrays. The phi operator
-# (>= vs >) and the leading negation differ per system and are load-bearing:
-# CW/Geo negate the wrapped value, so phi=180 maps consistently to -180 across
-# all four systems. The dict keys also serve as the whitelist of source systems.
-_TO_ERICSSON = {
-    "SPCS_Polar": lambda t, p: (t, np.where(p >= 180, p - 360, p)),
-    "SPCS_CW": lambda t, p: (t + 90, -np.where(p > 180, p - 360, p)),
-    "SPCS_CCW": lambda t, p: (t + 90, np.where(p >= 180, p - 360, p)),
-    "SPCS_Geo": lambda t, p: (np.flip(t), -np.where(p > 180, p - 360, p)),
 }
 
 
@@ -311,7 +293,7 @@ class AntennaPattern(Metadata):
             logger.warning(
                 f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'Pattern_3D' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
             )
-            df = self._change_coordinate_system(
+            df = to_internal_frame(
                 df, self.coordinate_system, DEFAULT_INTERNAL_COORD_SYSTEM
             )
         dTheta = np.diff(df["Theta"])
@@ -325,60 +307,6 @@ class AntennaPattern(Metadata):
                 "AntennaPattern: Non-unfirom gridded data detected in Phi. Calculations might misbehave."
             )
         return df
-
-    def _change_coordinate_system(
-        self,
-        Pattern_3D: xr.Dataset,
-        from_system: str,
-        to_system: str,
-    ) -> xr.Dataset:
-        """Change the coordinate system (theta, phi index) of the antenna pattern data.
-
-        Note: SPCS_Ericsson uses the same coordinate system as SPCS_Polar, however phi is defined between -180 and 179.
-        """
-        if to_system != "SPCS_Ericsson":
-            logger.error(
-                f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default (SPCS_Ericsson) for now."
-            )
-            raise NotImplementedError(
-                f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default (SPCS_Ericsson) for now."
-            )
-        transformable_systems = tuple(_TO_ERICSSON)
-        if from_system not in _TO_ERICSSON:
-            logger.error(
-                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
-            )
-            raise ValueError(
-                f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
-            )
-        phi = Pattern_3D.coords["Phi"].values
-        theta = Pattern_3D.coords["Theta"].values
-        # to_system is guaranteed SPCS_Ericsson by the guard above.
-        new_theta, new_phi = _TO_ERICSSON[from_system](theta, phi)
-        Pattern_3D = Pattern_3D.assign_coords(
-            Theta=("Theta", new_theta),
-            Phi=("Phi", new_phi),
-        )
-        new_theta = Pattern_3D.coords["Theta"].values
-        if new_theta.min() < 0 or new_theta.max() > 180:
-            logger.error(
-                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-            )
-            raise ValueError(
-                f"AntennaPattern: Transformed theta out of range [0, 180] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-            )
-        new_phi = Pattern_3D.coords["Phi"].values
-        if new_phi.min() < -180 or new_phi.max() > 179:
-            logger.error(
-                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-            )
-            raise ValueError(
-                f"AntennaPattern: Transformed phi out of range [-180, 179] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-            )
-        Pattern_3D = Pattern_3D.assign_attrs(
-            coordinate_system=to_system,
-        )
-        return Pattern_3D.sortby(["Theta", "Phi"])
 
     def get_metadata_dict(self) -> dict[str, Any]:
         """Get meta data dictionary of the antenna pattern data.

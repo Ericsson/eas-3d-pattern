@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.ngmn.coordinates import to_internal_frame
 
 
 def test_cw_out_of_spec_theta_is_rejected(pattern_path):
@@ -106,3 +107,23 @@ def test_transformed_phi_out_of_range_is_rejected(pattern_path):
     )
     with pytest.raises(ValueError, match="(?i)phi"):
         AntennaPattern(path, validate=False)
+
+
+def test_unsupported_target_system_is_rejected(pattern_path):
+    """Only SPCS_Ericsson is implemented as a transform target.
+
+    The internal frame is the sole supported destination; asking for any other
+    target must fail loudly rather than silently returning untransformed data.
+    Reached directly because ``_process_pattern_data`` only ever requests the
+    internal frame.
+    """
+    pattern = AntennaPattern(pattern_path(), validate=False)
+    with pytest.raises(NotImplementedError, match="SPCS_Ericsson"):
+        to_internal_frame(pattern.Pattern_3D, "SPCS_Polar", "SPCS_SomethingElse")
+
+
+def test_unsupported_source_system_is_rejected(pattern_path):
+    """A source system with no registered transform must be rejected by name."""
+    pattern = AntennaPattern(pattern_path(), validate=False)
+    with pytest.raises(ValueError, match="(?i)unsupported source coordinate system"):
+        to_internal_frame(pattern.Pattern_3D, "SPCS_Nonsense", "SPCS_Ericsson")
