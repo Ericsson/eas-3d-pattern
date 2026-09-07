@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - This changelog.
 - Test coverage for the metadata properties, the two plotting methods, and the directivity
-  calculations (78 tests), taking the suite from 44 to 122 and `src` coverage to 81%.
+  calculations, plus dedicated tests added alongside the parser decomposition (coordinates,
+  loader, normalization, non-uniform loading, processing, efficiency, peak). The suite grew
+  from 44 to **189 tests** and `src` statement coverage to **88%**.
   Covers metadata unit conversion, the required/optional key split, the `plot()` /
   `plot_3D()` return contract, and — for the plots — which data array is drawn on which
   axis, with which colour range and scale.
@@ -33,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image comparison), and `pytest-cov`. None of these affect the published wheel.
 
 ### Changed
+
+- Internal refactor (no public API change): the `AntennaPattern` god class was decomposed.
+  Logic moved out of `parser.py` (1140 → 422 lines) into `ngmn/` (`loader`, `coordinates`,
+  `metadata`) and `metrics/` (`directivity`, `efficiency`, `peak`, `quadrature`) sub-packages,
+  plus `_processing.py` and `_plotting.py`. The public import surface (`AntennaPattern`,
+  `SectorDefinition`, `NGMNSchema`, `SAMPLE_JSON`, `generate_report_eas`) is unchanged.
+
+- **BREAKING** — `AntennaPattern(data_filepath=...)` now accepts `str | pathlib.Path`
+  (previously `str` only), and the stored `AntennaPattern.data_filepath` attribute is now a
+  `pathlib.Path` regardless of the input type (previously the raw `str` as passed). Code that
+  passed a `str` continues to work; code that read `pattern.data_filepath` and relied on it
+  being a `str` (e.g. calling `str`-only methods on it) must wrap it in `str(...)` or use the
+  `Path` API. Internally, `os.path` was replaced by `pathlib` in `__init__` and `__str__`.
 
 - **BREAKING** — Corrected the spelling of two misspelled public properties on
   `AntennaPattern`. No deprecation aliases are provided; the old names are removed

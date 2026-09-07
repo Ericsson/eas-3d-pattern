@@ -3,7 +3,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .parser import AntennaPattern
 from .sample_data import SAMPLE_JSON
-from .schema_manager import NGMNSchema
+from .schema_manager import NGMNSchema, SchemaSource
 from .sector_definitions import SectorDefinition
 from .util_func.report import generate_report_eas
 
@@ -20,6 +20,7 @@ __all__ = [
     "SAMPLE_JSON",
     "AntennaPattern",
     "NGMNSchema",
+    "SchemaSource",
     "SectorDefinition",
     "generate_report_eas",
 ]

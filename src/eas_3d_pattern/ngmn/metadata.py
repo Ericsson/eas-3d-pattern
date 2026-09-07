@@ -47,37 +47,59 @@ class Metadata:
 
     @property
     def BASTA_AA_WP_version(self) -> str:
-        """BASTA AA working-package version string, verbatim from the source."""
+        """BASTA AA working-package version string, verbatim from the source.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["BASTA_AA_WP_version"])
 
     @property
     def supplier(self) -> str:
-        """Antenna supplier name."""
+        """Antenna supplier name.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Supplier"])
 
     @property
     def antenna_model(self) -> str:
-        """Antenna model identifier."""
+        """Antenna model identifier.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Antenna_Model"])
 
     @property
     def antenna_type(self) -> str:
-        """Antenna type designation."""
+        """Antenna type designation.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Antenna_Type"])
 
     @property
     def revision_version(self) -> str:
-        """Data-file revision version."""
+        """Data-file revision version.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Revision_Version"])
 
     @property
     def released_date(self) -> str:
-        """Release date of the pattern data."""
+        """Release date of the pattern data.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Released_Date"])
 
     @property
     def coordinate_system(self) -> str:
-        """Declared NGMN coordinate system of the source data."""
+        """Declared NGMN coordinate system of the source data.
+
+        Required. Raises ``KeyError`` if absent, since it drives the coordinate
+        transform and has no safe default.
+        """
         return str(self.raw_data["Coordinate_System"])
 
     @property
@@ -92,7 +114,10 @@ class Metadata:
 
     @property
     def pattern_type(self) -> str:
-        """Pattern type designation."""
+        """Pattern type designation.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Pattern_Type"])
 
     @property
@@ -243,13 +268,21 @@ class Metadata:
 
     @property
     def nominal_polarization(self) -> str:
-        """Nominal polarization designation."""
+        """Nominal polarization designation.
+
+        Required NGMN field. Raises ``KeyError`` if absent.
+        """
         return str(self.raw_data["Nominal_Polarization"])
 
     @property
-    def optional_comments(self) -> str:
-        """Free-text comments field from the source data."""
-        return str(self.raw_data["Optional_Comments"])
+    def optional_comments(self) -> str | None:
+        """Free-text comments field, or ``None`` if absent.
+
+        Not part of the NGMN BASTA schema (an extension field), so it is treated
+        as optional rather than required.
+        """
+        value = self.raw_data.get("Optional_Comments")
+        return None if value is None else str(value)
 
     @property
     def theta_sampling(self) -> np.ndarray | None:

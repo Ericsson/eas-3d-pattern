@@ -1,6 +1,5 @@
 import io
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -21,7 +20,6 @@ from eas_3d_pattern.metrics import (
 from eas_3d_pattern.ngmn.loader import (
     load_json_file,
     normalize_keys,
-    validate_against_schema,
 )
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import SectorDefinition
@@ -38,7 +36,7 @@ class AntennaPattern(PatternProcessing):
     All calculations and visualizations are then performed on the xarray dataset within self.Pattern_3D.
 
     Parameters:
-        data_filepath (str): Path to the JSON data file containing antenna pattern info.
+        data_filepath (str | Path): Path to the JSON data file containing antenna pattern info.
         validate (bool, optional): Whether to validate the data against the schema. Defaults to False.
 
     Note:
@@ -56,34 +54,22 @@ class AntennaPattern(PatternProcessing):
         FileNotFoundError: If data_filepath does not exist.
     """
 
-    def __init__(self, data_filepath: str, validate: bool = False):
-        if not os.path.exists(data_filepath):
-            logger.error(f"Data file not found: {data_filepath}")
-            raise FileNotFoundError(f"Data file not found: {data_filepath}")
-        self.data_filepath: str = data_filepath
-        self._schema: dict[str, Any] | None = NGMNSchema.schema_content
-        self.raw_data: dict[str, Any] = normalize_keys(load_json_file(data_filepath))
+    def __init__(self,
+                 data_filepath: str | Path,
+                 validate: bool = False):
+        path = Path(data_filepath)
+        if not path.exists():
+            logger.error(f"Data file not found: {path}")
+            raise FileNotFoundError(f"Data file not found: {path}")
+        self.data_filepath: Path = path
+
+        self.raw_data: dict[str, Any] = normalize_keys(load_json_file(self.data_filepath))
         if not self.raw_data.get("Data_Set"):
-            logger.error(
-                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
-            )
-            raise ValueError(
-                f"AntennaPattern: 'Data_Set' is empty or missing in {data_filepath}."
-            )
+            logger.error(f"AntennaPattern: 'Data_Set' is empty or missing in {self.data_filepath}.")
+            raise ValueError(f"AntennaPattern: 'Data_Set' is empty or missing in {self.data_filepath}.")
+
         if validate:
-            if self._schema is None:
-                logger.error(
-                    "AntennaPattern: Validation requested but no schema is available."
-                )
-                raise ValueError(
-                    "AntennaPattern: Validation requested but no schema is available."
-                )
-            validate_against_schema(
-                self.raw_data,
-                self._schema,
-                self.data_filepath,
-                NGMNSchema.source_message,
-            )
+            NGMNSchema.validate(self.raw_data, self.data_filepath)
 
         # ---- Process the pattern data into one normalized format ----
         self._sector_preset: str = "eas"
@@ -387,33 +373,48 @@ class AntennaPattern(PatternProcessing):
     def __str__(self) -> str:
         buf = io.StringIO()
         self.raw_pattern_dataframe.info(buf=buf)
+
+        def _na(item: object) -> str:
+            return "N/A" if item is None else str(item)
+
+        theta_range = (
+            [float(np.min(self.theta_sampling)), float(np.max(self.theta_sampling))]
+            if self.theta_sampling is not None
+            else None
+        )
+        phi_range = (
+            [float(np.min(self.phi_sampling)), float(np.max(self.phi_sampling))]
+            if self.phi_sampling is not None
+            else None
+        )
+
         lines = [
             "===== Info =====",
-            f"  File: '{os.path.basename(self.data_filepath)}'",
-            f"  Supplier: {self.supplier or 'N/A'}",
-            f"  Antenna Model: {self.antenna_model or 'N/A'}",
-            f"  Antenna Type: {self.antenna_type or 'N/A'}",
-            f"  Revision Version: {self.revision_version or 'N/A'}",
-            f"  Released Date: {self.released_date or 'N/A'}",
-            f"  Coordinate System: {self.coordinate_system or 'N/A'}",
-            f"  Beam ID: {self.beam_id or 'N/A'}",
-            f"  Pattern Type: {self.pattern_type or 'N/A'}",
-            f"  Nominal Polarization: {self.nominal_polarization or 'N/A'}",
-            f"  Optional Comments: {self.optional_comments or 'N/A'}",
+            f"  File: '{self.data_filepath.name}'",
+            f"  Supplier: {self.supplier}",
+            f"  Antenna Model: {self.antenna_model}",
+            f"  Antenna Type: {self.antenna_type}",
+            f"  Revision Version: {self.revision_version}",
+            f"  Released Date: {self.released_date}",
+            f"  Coordinate System: {self.coordinate_system}",
+            f"  Beam ID: {_na(self.beam_id)}",
+            f"  Pattern Type: {self.pattern_type}",
+            f"  Nominal Polarization: {self.nominal_polarization}",
+            f"  Optional Comments: {_na(self.optional_comments)}",
             "==== Parameters ====",
-            f"  Gain [dbi]: {self.gain_dbi if self.gain_dbi is not None else 'N/A'}",
-            f"  EIRP [dBm]: {self.eirp_dbm if self.eirp_dbm is not None else 'N/A'}",
-            f"  Phi HPBW [deg]: {self.phi_hpbw if self.phi_hpbw is not None else 'N/A'}",
-            f"  Theta HPBW [deg]: {self.theta_hpbw if self.theta_hpbw is not None else 'N/A'}",
-            f"  Front to Back [db]: {self.front_to_back if self.front_to_back is not None else 'N/A'}",
+            f"  Gain [dbi]: {_na(self.gain_dbi)}",
+            f"  EIRP [dBm]: {_na(self.eirp_dbm)}",
+            f"  Phi HPBW [deg]: {_na(self.phi_hpbw)}",
+            f"  Theta HPBW [deg]: {_na(self.theta_hpbw)}",
+            f"  Front to Back [db]: {_na(self.front_to_back)}",
             "==== Frequency & Tilt ====",
-            f"  Frequency [Hz]: {self.frequency_hz if self.frequency_hz is not None else 'N/A'}",
-            f"  Frequency Range [Hz]: {self.frequency_range if self.frequency_range is not None else 'N/A'}",
-            f"  Theta Electrical Tilt [deg]: {self.theta_electrical_tilt if self.theta_electrical_tilt is not None else 'N/A'}",
-            f"  Phi Electrical Pan [deg]: {self.phi_electrical_pan if self.phi_electrical_pan is not None else 'N/A'}",
+            f"  Frequency [Hz]: {_na(self.frequency_hz)}",
+            f"  Frequency Range [Hz]: {_na(self.frequency_range)}",
+            f"  Theta Electrical Tilt [deg]: {_na(self.theta_electrical_tilt)}",
+            f"  Phi Electrical Pan [deg]: {_na(self.phi_electrical_pan)}",
             "==== Dataset Info ====",
-            f"  Theta Sampling Range: {[float(np.min(self.theta_sampling)), float(np.max(self.theta_sampling))] if self.theta_sampling is not None else 'N/A'}",
-            f"  Phi Sampling Range: {[float(np.min(self.phi_sampling)), float(np.max(self.phi_sampling))] if self.phi_sampling is not None else 'N/A'}",
+            f"  Theta Sampling Range: {_na(theta_range)}",
+            f"  Phi Sampling Range: {_na(phi_range)}",
             f"  Pattern Data Info: {re.sub(r'<[^>]*>', '', buf.getvalue()) or 'N/A'}",
         ]
         return "\n".join(lines)
