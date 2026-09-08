@@ -140,5 +140,5 @@ class TestSectorTypeGuard:
         sectors = full_sphere_sectors()
         sectors.sectors["not-a-box"] = object()
 
-        with pytest.raises(TypeError, match="BoundaryBoxSquare"):
+        with pytest.raises(TypeError, match="BoundaryBox"):
             pattern.calculate_beam_efficiency(sector_definitions=sectors)

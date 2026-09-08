@@ -31,7 +31,8 @@ from types import MappingProxyType
 import xarray as xr
 
 from eas_3d_pattern.metrics.quadrature import DOMEGA, ensure_domega
-from eas_3d_pattern.sector import BoundaryBoxSquare, Sector
+from eas_3d_pattern.sector import BoundaryBox, Sector
+from eas_3d_pattern.util_func.guards import verify
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ BOUNDARY_OPERATORS: MappingProxyType[str, Callable[[float, float], bool]] = (
 
 
 def beam_efficiency(
-    pattern_3d: xr.Dataset,
+    pattern: xr.Dataset,
     sectors: Sector,
     powersum: bool = True,
 ) -> dict[str, float]:
@@ -65,7 +66,7 @@ def beam_efficiency(
     summation method for now.
 
     Args:
-        pattern_3d (xr.Dataset): Processed pattern dataset. Gains a ``dOmega``
+        pattern (xr.Dataset): Processed pattern dataset. Gains a ``dOmega``
             data variable as a side effect if it is not already present.
         sectors (Sector): Sector boundaries to integrate over.
         powersum (bool, optional): If True, efficiency is calculated on total
@@ -74,36 +75,26 @@ def beam_efficiency(
     Raises:
         ValueError: If the overall power sums to zero, which would make every
             efficiency nan or inf.
-        TypeError: If any sector is not a ``BoundaryBoxSquare``.
+        TypeError: If any sector is not a ``BoundaryBox``.
 
     Returns:
         dict[str, float]: Sector name to efficiency fraction.
     """
     logger.debug("AntennaPattern: Calculating beam efficiency of antenna pattern data.")
     component = POWER_COMPONENT_LIN if powersum else COPOLAR_COMPONENT_LIN
-    field_values = pattern_3d[component]
+    field_values = pattern[component]
 
-    ensure_domega(pattern_3d)
+    ensure_domega(pattern)
 
-    weighted_field_values = pattern_3d[DOMEGA] * field_values
+    weighted_field_values = pattern[DOMEGA] * field_values
     Sp_overall = float(weighted_field_values.sum())
-    if Sp_overall == 0:
-        logger.error(
-            "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
-        )
-        raise ValueError(
-            "AntennaPattern: Overall power is zero; cannot compute beam efficiency."
-        )
+    verify(Sp_overall != 0, "Overall power is zero; cannot compute beam efficiency.")
 
     efficiency = {}
     for sector_name, box in sectors.sectors.items():
-        if not isinstance(box, BoundaryBoxSquare):
-            logger.error(
-                f"Sector Definitions need to be class 'BoundaryBoxSquare' but is class {type(box)}."
-            )
-            raise TypeError(
-                f"Sector Definitions need to be class 'BoundaryBoxSquare' but is class {type(box)}."
-            )
+        verify(isinstance(box, BoundaryBox),
+               f"Sector Definitions need to be class 'BoundaryBox' but is class {type(box)}.",
+               TypeError)
         efficiency[sector_name] = float(
             _sector_sum(weighted_field_values, box) / Sp_overall
         )
@@ -112,13 +103,13 @@ def beam_efficiency(
 
 
 def _sector_sum(
-    weighted_field_values: xr.DataArray, box: BoundaryBoxSquare
+    weighted_field_values: xr.DataArray, box: BoundaryBox
 ) -> xr.DataArray:
     """Sum the weighted field inside one rectangular sector.
 
     Args:
         weighted_field_values (xr.DataArray): Field already multiplied by ``dOmega``.
-        box (BoundaryBoxSquare): Theta/Phi bounds, each paired with the comparison
+        box (BoundaryBox): Theta/Phi bounds, each paired with the comparison
             operator to apply.
 
     Returns:
