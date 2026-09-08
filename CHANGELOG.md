@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage for the metadata properties, the two plotting methods, and the directivity
   calculations, plus dedicated tests added alongside the parser decomposition (coordinates,
   loader, normalization, non-uniform loading, processing, efficiency, peak). The suite grew
-  from 44 to **189 tests** and `src` statement coverage to **88%**.
+  from 44 to **228 tests** and `src` statement coverage to **88%**.
   Covers metadata unit conversion, the required/optional key split, the `plot()` /
   `plot_3D()` return contract, and — for the plots — which data array is drawn on which
   axis, with which colour range and scale.
@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   environments, so they can be excluded with `pytest -m "not image"`.
 - Development dependencies: `jupyterlab`, `matplotlib` and `pytest-mpl` (test-only, for
   image comparison), and `pytest-cov`. None of these affect the published wheel.
+- A `verify()` guard helper in `eas_3d_pattern.util_func.guards`: a single check-and-raise
+  utility (log an error and raise a chosen exception when a condition is falsy) that
+  replaces the repeated inline `if ...: logger.error(...); raise ...` blocks across the
+  parser, processing, metrics, coordinates and sector modules. Covered by `test_guards.py`.
+- `json_load()` in `eas_3d_pattern.ngmn.loader` (also re-exported from `eas_3d_pattern.ngmn`):
+  reads a pattern file and normalizes vendor-specific keys in one call, composed from the
+  pure `load_json_file()` and `normalize_keys()` helpers.
 
 ### Changed
 
@@ -49,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal refactor (no public API change): the `AntennaPattern` god class was decomposed.
   Logic moved out of `parser.py` (1140 → 422 lines) into `ngmn/` (`loader`, `coordinates`,
   `metadata`) and `metrics/` (`directivity`, `efficiency`, `peak`, `quadrature`) sub-packages,
-  plus `_processing.py` and `_plotting.py`. The public import surface (`AntennaPattern`,
+  plus `processing.py` and `plotting.py`. The public import surface (`AntennaPattern`,
   `SectorDefinition`, `NGMNSchema`, `SAMPLE_JSON`, `generate_report_eas`) is unchanged.
 
 - **BREAKING** — `AntennaPattern(data_filepath=...)` now accepts `str | pathlib.Path`
@@ -112,6 +119,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delegates to it, so the loaded sectors are identical. The `load_default` /
   `top_border` parameters are scheduled for removal in a future release, at which
   point `SectorDefinition()` will construct an empty instance.
+
+  ```python
+  # Deprecated — emits a DeprecationWarning (still works):
+  sectors = SectorDefinition(load_default=True, top_border=85.0)  # EAS sectors
+  sectors = SectorDefinition(load_default=False)                  # empty instance
+
+  # New way:
+  from eas_3d_pattern.sector import from_preset, Sector
+  sectors = from_preset("eas", top_border=85.0)  # EAS sectors
+  sectors = Sector()                              # empty instance
+
+  # Still supported (SectorDefinition classmethod delegates to the preset registry):
+  sectors = SectorDefinition.from_preset("eas", top_border=85.0)
+  ```
 - `AntennaPattern.Pattern_3D` is now a deprecated read-only alias for
   `AntennaPattern.pattern` and emits a `DeprecationWarning`. It returns the same
   `xarray.Dataset` object as `pattern` (not a copy). Scheduled for removal in a
