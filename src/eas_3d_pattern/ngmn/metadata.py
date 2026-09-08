@@ -9,8 +9,8 @@
 """NGMN BASTA metadata accessors for antenna pattern data.
 
 This module holds the read-only NGMN BASTA metadata properties. They are pure
-pass-throughs over ``raw_data`` (the normalized NGMN BASTA JSON) with no side
-effects and no dependence on the processed ``Pattern_3D`` dataset.
+pass-throughs over ``data`` (the normalized NGMN BASTA JSON) with no side
+effects and no dependence on the processed ``pattern`` dataset.
 
 Split out of ``parser.py`` (Phase 2 of the god-class decomposition, plan
 section 2.1.3).
@@ -35,15 +35,37 @@ _SAMPLING_STOP_EPSILON = 1e-6
 
 
 class Metadata:
-    """Read-only NGMN BASTA metadata accessors over ``raw_data``.
+    """Read-only NGMN BASTA metadata accessors over ``data``.
 
     Provided by the host class at runtime:
 
     Attributes:
-        raw_data (dict[str, Any]): Normalized NGMN BASTA JSON payload.
+        data (dict[str, Any]): Normalized NGMN BASTA JSON payload.
     """
 
-    raw_data: dict[str, Any]
+    data: dict[str, Any]
+
+    @property
+    def raw_data(self) -> dict[str, Any]:
+        """Deprecated alias for :attr:`data`.
+
+        The payload is normalized on load, so ``raw_data`` was a misnomer. Use
+        :attr:`data` instead.
+
+        Returns:
+            dict[str, Any]: The normalized NGMN BASTA JSON payload (the same
+            object as :attr:`data`).
+
+        Warns:
+            DeprecationWarning: Always; ``raw_data`` is scheduled for removal.
+        """
+        warnings.warn(
+            "AntennaPattern.raw_data is deprecated and will be removed in a future "
+            "release; use AntennaPattern.data instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.data
 
     @property
     def BASTA_AA_WP_version(self) -> str:
@@ -51,7 +73,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["BASTA_AA_WP_version"])
+        return str(self.data["BASTA_AA_WP_version"])
 
     @property
     def supplier(self) -> str:
@@ -59,7 +81,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Supplier"])
+        return str(self.data["Supplier"])
 
     @property
     def antenna_model(self) -> str:
@@ -67,7 +89,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Antenna_Model"])
+        return str(self.data["Antenna_Model"])
 
     @property
     def antenna_type(self) -> str:
@@ -75,7 +97,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Antenna_Type"])
+        return str(self.data["Antenna_Type"])
 
     @property
     def revision_version(self) -> str:
@@ -83,7 +105,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Revision_Version"])
+        return str(self.data["Revision_Version"])
 
     @property
     def released_date(self) -> str:
@@ -91,7 +113,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Released_Date"])
+        return str(self.data["Released_Date"])
 
     @property
     def coordinate_system(self) -> str:
@@ -100,17 +122,17 @@ class Metadata:
         Required. Raises ``KeyError`` if absent, since it drives the coordinate
         transform and has no safe default.
         """
-        return str(self.raw_data["Coordinate_System"])
+        return str(self.data["Coordinate_System"])
 
     @property
     def pattern_name(self) -> str | None:
         """Optional pattern name, or ``None`` if absent."""
-        return self.raw_data.get("Pattern_Name")
+        return self.data.get("Pattern_Name")
 
     @property
     def beam_id(self) -> str | None:
         """Optional beam identifier, or ``None`` if absent."""
-        return self.raw_data.get("Beam_ID")
+        return self.data.get("Beam_ID")
 
     @property
     def pattern_type(self) -> str:
@@ -118,12 +140,12 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Pattern_Type"])
+        return str(self.data["Pattern_Type"])
 
     @property
     def frequency_hz(self) -> float:
         """Operating frequency normalized to hertz from any declared unit."""
-        freq_dict = self.raw_data["Frequency"]
+        freq_dict = self.data["Frequency"]
         val = float(freq_dict.get("value"))
         unit = freq_dict.get("unit", "")
         match unit:
@@ -143,7 +165,7 @@ class Metadata:
     @property
     def frequency_range(self) -> list[float] | None:
         """Frequency bounds ``[lower, upper]`` in hertz, or ``None`` if absent."""
-        freq_range_dict = self.raw_data.get("Frequency_Range")
+        freq_range_dict = self.data.get("Frequency_Range")
         if not freq_range_dict:
             return None
         freq_range_list = [
@@ -168,7 +190,7 @@ class Metadata:
     @property
     def eirp_dbm(self) -> float | None:
         """EIRP normalized to dBm from any declared power unit, or ``None``."""
-        EIRP_dict = self.raw_data.get("EIRP")
+        EIRP_dict = self.data.get("EIRP")
         if not EIRP_dict:
             return None
         val = float(EIRP_dict.get("value"))
@@ -188,7 +210,7 @@ class Metadata:
     @property
     def output_power_watt(self) -> float | None:
         """Configured output power normalized to watts, or ``None`` if absent."""
-        configured_output_power = self.raw_data.get("Configured_Output_Power")
+        configured_output_power = self.data.get("Configured_Output_Power")
         if not configured_output_power:
             return None
         val = float(configured_output_power.get("value"))
@@ -208,7 +230,7 @@ class Metadata:
     @property
     def gain_dbi(self) -> float | None:
         """Antenna gain in dBi (dBd converted with +2.15), or ``None`` if absent."""
-        gain_dict = self.raw_data.get("Gain")
+        gain_dict = self.data.get("Gain")
         if not gain_dict:
             return None
         val = float(gain_dict.get("value"))
@@ -224,47 +246,47 @@ class Metadata:
     @property
     def configuration(self) -> str | None:
         """Optional configuration label, or ``None`` if absent."""
-        return self.raw_data.get("Configuration")
+        return self.data.get("Configuration")
 
     @property
     def rf_port(self) -> str | None:
         """Optional RF port identifier, or ``None`` if absent."""
-        return self.raw_data.get("RF_Port")
+        return self.data.get("RF_Port")
 
     @property
     def array_id(self) -> str | None:
         """Optional array identifier, or ``None`` if absent."""
-        return self.raw_data.get("Array_ID")
+        return self.data.get("Array_ID")
 
     @property
     def array_position(self) -> str | None:
         """Optional array position label, or ``None`` if absent."""
-        return self.raw_data.get("Array_Position")
+        return self.data.get("Array_Position")
 
     @property
     def phi_hpbw(self) -> float:
         """Azimuth (phi) half-power beamwidth in degrees."""
-        return float(self.raw_data["Phi_HPBW"])
+        return float(self.data["Phi_HPBW"])
 
     @property
     def theta_hpbw(self) -> float:
         """Elevation (theta) half-power beamwidth in degrees."""
-        return float(self.raw_data["Theta_HPBW"])
+        return float(self.data["Theta_HPBW"])
 
     @property
     def front_to_back(self) -> float:
         """Front-to-back ratio in dB."""
-        return float(self.raw_data["Front_to_Back"])
+        return float(self.data["Front_to_Back"])
 
     @property
     def phi_electrical_pan(self) -> float | None:
         """Electrical azimuth pan in degrees, or ``None`` if absent."""
-        return self.raw_data.get("Phi_Electrical_Pan")
+        return self.data.get("Phi_Electrical_Pan")
 
     @property
     def theta_electrical_tilt(self) -> float | None:
         """Electrical downtilt in degrees, or ``None`` if absent."""
-        return self.raw_data.get("Theta_Electrical_Tilt")
+        return self.data.get("Theta_Electrical_Tilt")
 
     @property
     def nominal_polarization(self) -> str:
@@ -272,7 +294,7 @@ class Metadata:
 
         Required NGMN field. Raises ``KeyError`` if absent.
         """
-        return str(self.raw_data["Nominal_Polarization"])
+        return str(self.data["Nominal_Polarization"])
 
     @property
     def optional_comments(self) -> str | None:
@@ -281,13 +303,13 @@ class Metadata:
         Not part of the NGMN BASTA schema (an extension field), so it is treated
         as optional rather than required.
         """
-        value = self.raw_data.get("Optional_Comments")
+        value = self.data.get("Optional_Comments")
         return None if value is None else str(value)
 
     @property
     def theta_sampling(self) -> np.ndarray | None:
         """Theta grid as a column vector, or ``None`` for non-uniform sampling."""
-        theta_sampling_list = self.raw_data.get("Theta_Sampling")
+        theta_sampling_list = self.data.get("Theta_Sampling")
         if not theta_sampling_list:
             return None
         return np.arange(
@@ -299,7 +321,7 @@ class Metadata:
     @property
     def phi_sampling(self) -> np.ndarray | None:
         """Phi grid as a row vector, or ``None`` for non-uniform sampling."""
-        phi_sampling_list = self.raw_data.get("Phi_Sampling")
+        phi_sampling_list = self.data.get("Phi_Sampling")
         if not phi_sampling_list:
             return None
         return np.arange(
@@ -312,14 +334,14 @@ class Metadata:
     def raw_pattern_dataframe(self) -> pd.DataFrame:
         """Raw ``Data_Set`` as a DataFrame with the declared row-structure columns."""
         return pd.DataFrame(
-            self.raw_data["Data_Set"], columns=self.raw_data["Data_Set_Row_Structure"]
+            self.data["Data_Set"], columns=self.data["Data_Set_Row_Structure"]
         )
 
     @property
     def is_uniform_sampling(self) -> bool:
         """True when both Theta and Phi sampling triples are present."""
         return bool(
-            self.raw_data.get("Theta_Sampling") and self.raw_data.get("Phi_Sampling")
+            self.data.get("Theta_Sampling") and self.data.get("Phi_Sampling")
         )
 
     @property

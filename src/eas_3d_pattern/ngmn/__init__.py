@@ -22,6 +22,7 @@ from eas_3d_pattern.ngmn.coordinates import (
     to_internal_frame,
 )
 from eas_3d_pattern.ngmn.loader import (
+    json_load,
     load_json_file,
     normalize_keys,
     validate_against_schema,
@@ -32,6 +33,7 @@ __all__ = [
     "DEFAULT_INTERNAL_COORD_SYSTEM",
     "EXPECTED_COORDINATE_SYSTEMS",
     "Metadata",
+    "json_load",
     "load_json_file",
     "normalize_keys",
     "to_internal_frame",

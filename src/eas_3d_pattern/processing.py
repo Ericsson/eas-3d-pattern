@@ -29,6 +29,7 @@ a metadata accessor.
 from __future__ import annotations
 
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -53,7 +54,30 @@ COMPONENT_COLUMNS = [
 
 
 class PatternProcessing(Metadata):
-    """Builds the processed ``Pattern_3D`` dataset from raw NGMN rows."""
+    """Builds the processed ``pattern`` dataset from raw NGMN rows."""
+
+    pattern: xr.Dataset
+
+    @property
+    def Pattern_3D(self) -> xr.Dataset:
+        """Deprecated alias for :attr:`pattern`.
+
+        Renamed to the PEP 8-compliant :attr:`pattern`. Use that instead.
+
+        Returns:
+            xr.Dataset: The processed pattern dataset (the same object as
+            :attr:`pattern`).
+
+        Warns:
+            DeprecationWarning: Always; ``Pattern_3D`` is scheduled for removal.
+        """
+        warnings.warn(
+            "AntennaPattern.Pattern_3D is deprecated and will be removed in a future "
+            "release; use AntennaPattern.pattern instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.pattern
 
     def _process_pattern_data(self) -> xr.Dataset:
         """Process the raw data during __init__.
@@ -141,7 +165,7 @@ class PatternProcessing(Metadata):
         # coordinate system and grid
         if self.coordinate_system != DEFAULT_INTERNAL_COORD_SYSTEM:
             logger.warning(
-                f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'Pattern_3D' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
+                f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'pattern' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
             )
             df = to_internal_frame(
                 df, self.coordinate_system, DEFAULT_INTERNAL_COORD_SYSTEM

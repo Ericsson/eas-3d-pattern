@@ -48,5 +48,5 @@ def test_construction_normalizes_theta_tilt(pattern_path):
     """End-to-end: a file using 'Theta_Tilt' is normalized during init (issue #5)."""
     path = pattern_path(extra={"Theta_Tilt": 6.0})
     pattern = AntennaPattern(path, validate=False)
-    assert pattern.raw_data["Theta_Electrical_Tilt"] == 6.0
-    assert "Theta_Tilt" not in pattern.raw_data
+    assert pattern.data["Theta_Electrical_Tilt"] == 6.0
+    assert "Theta_Tilt" not in pattern.data

@@ -137,7 +137,7 @@ def _process_a_file(
         data = pattern.get_metadata_dict()
         top_border = pattern.calculate_top_3db_point(power=False)
         eas_sectors = SectorDefinition(load_default=True, top_border=top_border)
-        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] < -20):
+        if (data["Phi_HPBW"] <= 50) & (pattern.pattern.peak_coordinates[1] < -20):
             logger.info(
                 "Reporting: Identified dual beam antenna. Overwriting sectors to dual beam definition for reporting."
             )
@@ -155,7 +155,7 @@ def _process_a_file(
                 phi_min=(0.0, "<"),
                 phi_max=(180.0, "<="),
             )
-        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] > 20):
+        if (data["Phi_HPBW"] <= 50) & (pattern.pattern.peak_coordinates[1] > 20):
             logger.info(
                 "Reporting: Identified dual beam antenna. Changing sectors to dual beam definition for reporting."
             )

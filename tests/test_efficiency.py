@@ -76,7 +76,7 @@ class TestNgmnTypeAMetadataGuard:
     def test_missing_hpbw_raises(self, pattern_path, missing_key):
         pattern = AntennaPattern(pattern_path(), validate=False)
         pattern.sector_preset = "ngmn-v13-type-a"
-        del pattern.raw_data[missing_key]
+        del pattern.data[missing_key]
 
         with pytest.raises(ValueError, match="(?i)hpbw"):
             pattern.calculate_beam_efficiency()

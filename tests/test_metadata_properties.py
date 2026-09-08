@@ -2,7 +2,7 @@
 
 Scope is deliberately narrow: the properties that contain *logic* — unit
 conversion — plus the required/optional key split. Properties that are a bare
-``str(self.raw_data[key])`` pass-through are not individually tested; there is
+``str(self.data[key])`` pass-through are not individually tested; there is
 nothing to break in them short of a typo in the key name, and the parser cannot
 construct without the required keys anyway.
 

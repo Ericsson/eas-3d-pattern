@@ -28,9 +28,9 @@ class TestNonUniformLoading:
     def test_loads_and_builds_dataset(self, nonuniform_pattern_path):
         pattern = AntennaPattern(nonuniform_pattern_path(), validate=False)
         assert pattern.is_uniform_sampling is False
-        assert set(pattern.Pattern_3D.dims) == {"Theta", "Phi"}
-        assert pattern.Pattern_3D.sizes["Theta"] == 37
-        assert pattern.Pattern_3D.sizes["Phi"] == 72
+        assert set(pattern.pattern.dims) == {"Theta", "Phi"}
+        assert pattern.pattern.sizes["Theta"] == 37
+        assert pattern.pattern.sizes["Phi"] == 72
 
     def test_sampling_accessors_return_none(self, nonuniform_pattern_path):
         """Without triples there is no derived grid to return.

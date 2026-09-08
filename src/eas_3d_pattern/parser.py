@@ -8,8 +8,6 @@ import numpy as np
 import plotly.graph_objects as go
 import xarray as xr
 
-from eas_3d_pattern._plotting import build_heatmap, build_polar_3d
-from eas_3d_pattern._processing import PatternProcessing
 from eas_3d_pattern.metrics import (
     beam_efficiency,
     directivity,
@@ -17,12 +15,12 @@ from eas_3d_pattern.metrics import (
     losses,
     top_3db_border,
 )
-from eas_3d_pattern.ngmn.loader import (
-    load_json_file,
-    normalize_keys,
-)
+from eas_3d_pattern.ngmn import json_load
+from eas_3d_pattern.plotting import build_heatmap, build_polar_3d
+from eas_3d_pattern.processing import PatternProcessing
 from eas_3d_pattern.schema_manager import NGMNSchema
 from eas_3d_pattern.sector_definitions import SectorDefinition
+from eas_3d_pattern.util_func.guards import verify
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +30,8 @@ class AntennaPattern(PatternProcessing):
 
     Initializes the AntennaPattern object by loading and validating (default False) the antenna pattern data against the NGMN JSON schema.
     The schema is loaded within the schema_manager.py module as a singleton.
-    Antenna pattern data is eagerly processed into an xarray dataset for calculation and plotting. The xarray dataset is stored in self.Pattern_3D.
-    All calculations and visualizations are then performed on the xarray dataset within self.Pattern_3D.
+    Antenna pattern data is eagerly processed into an xarray dataset for calculation and plotting. The xarray dataset is stored in self.pattern.
+    All calculations and visualizations are then performed on the xarray dataset within self.pattern.
 
     Parameters:
         data_filepath (str | Path): Path to the JSON data file containing antenna pattern info.
@@ -58,22 +56,18 @@ class AntennaPattern(PatternProcessing):
                  data_filepath: str | Path,
                  validate: bool = False):
         path = Path(data_filepath)
-        if not path.exists():
-            logger.error(f"Data file not found: {path}")
-            raise FileNotFoundError(f"Data file not found: {path}")
+        verify(path.exists(), f"Data file not found: {path}", FileNotFoundError)
         self.data_filepath: Path = path
 
-        self.raw_data: dict[str, Any] = normalize_keys(load_json_file(self.data_filepath))
-        if not self.raw_data.get("Data_Set"):
-            logger.error(f"AntennaPattern: 'Data_Set' is empty or missing in {self.data_filepath}.")
-            raise ValueError(f"AntennaPattern: 'Data_Set' is empty or missing in {self.data_filepath}.")
+        self.data: dict[str, Any] = json_load(self.data_filepath)
+        verify(self.data.get("Data_Set"), f"'Data_Set' is empty or missing in {self.data_filepath}.")
 
         if validate:
-            NGMNSchema.validate(self.raw_data, self.data_filepath)
+            NGMNSchema.validate(self.data, self.data_filepath)
 
         # ---- Process the pattern data into one normalized format ----
         self._sector_preset: str = "eas"
-        self.Pattern_3D: xr.Dataset = self._process_pattern_data()
+        self.pattern: xr.Dataset = self._process_pattern_data()
 
     @property
     def sector_preset(self) -> str:
@@ -128,7 +122,7 @@ class AntennaPattern(PatternProcessing):
         Example:
             >>> meta_dict = antenna_pattern.get_metadata_dict()
         """
-        metadata = self.raw_data.copy()
+        metadata = self.data.copy()
         metadata.pop("Data_Set", None)
         metadata.pop("Data_Set_Row_Structure", None)
         return metadata
@@ -152,7 +146,7 @@ class AntennaPattern(PatternProcessing):
             >>> directivity_dbi = antenna_pattern.calculate_directivity()
             >>> losses = gain_dbi - directivity_dbi
         """
-        return directivity(self.Pattern_3D)
+        return directivity(self.pattern)
 
     def calculate_losses(self) -> float:
         """Calculate the losses of the antenna pattern data.
@@ -171,7 +165,7 @@ class AntennaPattern(PatternProcessing):
         Example:
             >>> losses = antenna_pattern.calculate_losses()
         """
-        return losses(self.Pattern_3D, self.gain_dbi)
+        return losses(self.pattern, self.gain_dbi)
 
     def _build_sectors_from_preset(self) -> SectorDefinition:
         """Build a SectorDefinition from the active preset and pattern metadata.
@@ -190,8 +184,8 @@ class AntennaPattern(PatternProcessing):
 
         if self._sector_preset == "ngmn-v13-type-a":
             theta_peak, _ = self.find_peak_coordinates(power=False)
-            theta_hpbw = self.raw_data.get("Theta_HPBW")
-            phi_hpbw = self.raw_data.get("Phi_HPBW")
+            theta_hpbw = self.data.get("Theta_HPBW")
+            phi_hpbw = self.data.get("Phi_HPBW")
             if theta_hpbw is None or phi_hpbw is None:
                 raise ValueError(
                     "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
@@ -247,7 +241,7 @@ class AntennaPattern(PatternProcessing):
         """
         if sector_definitions is None:
             sector_definitions = self._build_sectors_from_preset()
-        return beam_efficiency(self.Pattern_3D, sector_definitions, powersum)
+        return beam_efficiency(self.pattern, sector_definitions, powersum)
 
     def find_peak_coordinates(self, power: bool = False) -> tuple[float, float]:
         """Finds the peak coordinates of Theta/Phi of the antenna pattern data.
@@ -265,12 +259,12 @@ class AntennaPattern(PatternProcessing):
             tuple[float, float]: (theta, phi) coordinates of the peak in degress.
 
         Note:
-            Publishes ``peak_coordinates`` on ``self.Pattern_3D.attrs``. The side
+            Publishes ``peak_coordinates`` on ``self.pattern.attrs``. The side
             effect is deliberate and relied upon by ``util_func/report.py``.
         """
-        peak = find_peak(self.Pattern_3D, power)
+        peak = find_peak(self.pattern, power)
         # enrich attributes with peak
-        self.Pattern_3D = self.Pattern_3D.assign_attrs(
+        self.pattern = self.pattern.assign_attrs(
             peak_coordinates=peak,
         )
         return peak
@@ -295,10 +289,10 @@ class AntennaPattern(PatternProcessing):
         """
         theta_val_peak, phi_val_peak = self.find_peak_coordinates(power)
         top_border = top_3db_border(
-            self.Pattern_3D, theta_val_peak, phi_val_peak, power
+            self.pattern, theta_val_peak, phi_val_peak, power
         )
         # enrich with top_3db_point
-        self.Pattern_3D.attrs["top_3db_point"] = top_border
+        self.pattern.attrs["top_3db_point"] = top_border
         return top_border
 
     def plot(
@@ -324,7 +318,7 @@ class AntennaPattern(PatternProcessing):
 
         """
         fig = build_heatmap(
-            self.Pattern_3D,
+            self.pattern,
             title=Path(self.data_filepath).name,
             component_name=component_name,
             remove_layout_components=remove_layout_components,
@@ -359,7 +353,7 @@ class AntennaPattern(PatternProcessing):
 
         """
         fig = build_polar_3d(
-            self.Pattern_3D,
+            self.pattern,
             title=Path(self.data_filepath).name,
             component_name=component_name,
             db_floor=db_floor,

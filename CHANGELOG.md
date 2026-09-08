@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AntennaPattern.plot()` and `AntennaPattern.plot_3D()` return annotations are now
   `go.Figure | None` (was `None | go.Figure`). No behavioural change.
 - Reworded a `calculate_directivity()` docstring note for clarity.
+- Renamed the loaded-payload attribute `AntennaPattern.raw_data` to
+  `AntennaPattern.data`. The payload is normalized on load (vendor key variants are
+  mapped to their canonical NGMN names), so `raw_data` was a misnomer. The old name
+  is preserved as a deprecated alias (see *Deprecated*), so existing code keeps
+  working; migrate attribute access from `pattern.raw_data` to `pattern.data`.
+- Renamed the processed-dataset attribute `AntennaPattern.Pattern_3D` to
+  `AntennaPattern.pattern` (PEP 8 lowercase, dropped the redundant `_3D` suffix). The
+  old name is preserved as a deprecated alias (see *Deprecated*); migrate attribute
+  access from `antenna.Pattern_3D` to `antenna.pattern`.
 
 ### Removed
 
@@ -75,6 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- `AntennaPattern.Pattern_3D` is now a deprecated read-only alias for
+  `AntennaPattern.pattern` and emits a `DeprecationWarning`. It returns the same
+  `xarray.Dataset` object as `pattern` (not a copy). Scheduled for removal in a
+  future release; use `antenna.pattern` instead.
+- `AntennaPattern.raw_data` is now a deprecated read-only alias for
+  `AntennaPattern.data` and emits a `DeprecationWarning`. It returns the same
+  dictionary object as `data` (not a copy), so in-place mutation through the alias
+  still reaches the underlying payload. Scheduled for removal in a future release;
+  use `pattern.data` instead.
 - `AntennaPattern.is_nonuniform_sampling` now emits a `DeprecationWarning` and is
   scheduled for removal in a future release. It is exactly the negation of
   `is_uniform_sampling`; use `not pattern.is_uniform_sampling` instead.

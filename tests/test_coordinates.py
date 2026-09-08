@@ -50,7 +50,7 @@ def test_valid_cw_pattern_constructs_with_internal_ranges(pattern_path):
         peak_phi=0.0,
     )
     pattern = AntennaPattern(path, validate=False)
-    theta = pattern.Pattern_3D.coords["Theta"].values
+    theta = pattern.pattern.coords["Theta"].values
     assert theta.min() >= 0.0
     assert theta.max() <= 180.0
 
@@ -83,7 +83,7 @@ def test_phi_boundary_consistent_across_transforms(
         peak_phi=0.0,
     )
     pattern = AntennaPattern(path, validate=False)
-    phi = pattern.Pattern_3D.coords["Phi"].values
+    phi = pattern.pattern.coords["Phi"].values
     assert phi.min() >= -180.0
     assert phi.max() <= 179.0
     assert not np.any(np.isclose(phi, 180.0))
@@ -119,11 +119,11 @@ def test_unsupported_target_system_is_rejected(pattern_path):
     """
     pattern = AntennaPattern(pattern_path(), validate=False)
     with pytest.raises(NotImplementedError, match="SPCS_Ericsson"):
-        to_internal_frame(pattern.Pattern_3D, "SPCS_Polar", "SPCS_SomethingElse")
+        to_internal_frame(pattern.pattern, "SPCS_Polar", "SPCS_SomethingElse")
 
 
 def test_unsupported_source_system_is_rejected(pattern_path):
     """A source system with no registered transform must be rejected by name."""
     pattern = AntennaPattern(pattern_path(), validate=False)
     with pytest.raises(ValueError, match="(?i)unsupported source coordinate system"):
-        to_internal_frame(pattern.Pattern_3D, "SPCS_Nonsense", "SPCS_Ericsson")
+        to_internal_frame(pattern.pattern, "SPCS_Nonsense", "SPCS_Ericsson")

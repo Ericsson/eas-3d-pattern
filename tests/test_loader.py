@@ -85,7 +85,7 @@ class TestSchemaValidation:
     def test_validation_skipped_by_default(self, pattern_path):
         """Without validate=True the same minimal file loads fine."""
         pattern = AntennaPattern(pattern_path(), validate=False)
-        assert pattern.raw_data["Coordinate_System"] == "SPCS_Ericsson"
+        assert pattern.data["Coordinate_System"] == "SPCS_Ericsson"
 
     @pytest.mark.slow
     def test_bundled_sample_passes_real_schema(self):
@@ -96,7 +96,7 @@ class TestSchemaValidation:
         minimal to be schema-valid. Slow: validation walks every data row.
         """
         pattern = AntennaPattern(SAMPLE_JSON[0], validate=True)
-        assert pattern.raw_data["Data_Set"]
+        assert pattern.data["Data_Set"]
 
 
 class TestDataSetPresence:
@@ -109,6 +109,38 @@ class TestDataSetPresence:
         )
         with pytest.raises(ValueError, match="(?i)data_set"):
             AntennaPattern(str(path), validate=False)
+
+
+class TestRawDataDeprecatedAlias:
+    """``raw_data`` is a deprecated alias for ``data`` (renamed in v0.2.0)."""
+
+    def test_raw_data_returns_same_object_as_data(self, pattern_path):
+        """The alias returns the very same dict object, not a copy."""
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        with pytest.warns(DeprecationWarning):
+            assert pattern.raw_data is pattern.data
+
+    def test_raw_data_access_warns(self, pattern_path):
+        """Reading ``raw_data`` emits a DeprecationWarning naming ``data``."""
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        with pytest.warns(DeprecationWarning, match="(?i)use antennapattern.data"):
+            _ = pattern.raw_data
+
+
+class TestPattern3DDeprecatedAlias:
+    """``Pattern_3D`` is a deprecated alias for ``pattern`` (renamed in v0.2.0)."""
+
+    def test_pattern_3d_returns_same_object_as_pattern(self, pattern_path):
+        """The alias returns the very same dataset object, not a copy."""
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        with pytest.warns(DeprecationWarning):
+            assert pattern.Pattern_3D is pattern.pattern
+
+    def test_pattern_3d_access_warns(self, pattern_path):
+        """Reading ``Pattern_3D`` emits a DeprecationWarning naming ``pattern``."""
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        with pytest.warns(DeprecationWarning, match="(?i)use antennapattern.pattern"):
+            _ = pattern.Pattern_3D
 
 
 class TestRepr:

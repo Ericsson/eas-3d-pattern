@@ -61,11 +61,11 @@ class TestFindPeakCoordinates:
         contract; report generation breaks without it.
         """
         pattern = AntennaPattern(pattern_path(), validate=False)
-        assert "peak_coordinates" not in pattern.Pattern_3D.attrs
+        assert "peak_coordinates" not in pattern.pattern.attrs
 
         theta, phi = pattern.find_peak_coordinates(power=False)
 
-        assert pattern.Pattern_3D.attrs["peak_coordinates"] == (theta, phi)
+        assert pattern.pattern.attrs["peak_coordinates"] == (theta, phi)
 
 
 class TestTopThreeDbPoint:
@@ -97,7 +97,7 @@ class TestTopThreeDbPoint:
         """The border is also recorded on the dataset attrs as a side effect."""
         pattern = AntennaPattern(pattern_path(), validate=False)
         top = pattern.calculate_top_3db_point(power=False)
-        assert pattern.Pattern_3D.attrs["top_3db_point"] == pytest.approx(top)
+        assert pattern.pattern.attrs["top_3db_point"] == pytest.approx(top)
 
     def test_peak_side_effect_survives_via_top_3db(self, pattern_path):
         """``report.py`` calls only ``calculate_top_3db_point`` then reads the peak.
@@ -107,7 +107,7 @@ class TestTopThreeDbPoint:
         """
         pattern = AntennaPattern(pattern_path(), validate=False)
         pattern.calculate_top_3db_point(power=False)
-        assert "peak_coordinates" in pattern.Pattern_3D.attrs
+        assert "peak_coordinates" in pattern.pattern.attrs
 
 
 # The ``not isinstance(peak_tuple, tuple)`` guard in ``find_peak`` is NOT covered,

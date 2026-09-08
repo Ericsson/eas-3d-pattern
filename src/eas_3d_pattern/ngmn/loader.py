@@ -37,6 +37,24 @@ ALTERNATIVES: dict[str, str] = {
     "Theta_Tilt": "Theta_Electrical_Tilt",
 }
 
+def json_load(filepath: str | Path,
+              normalize: bool = True) -> dict[str, Any]:
+    """json_load.
+
+    This is a full json load operation which also normalizes
+    the data by default. The normalization can be disabled by the flag.
+    Normalization modifies the json loaded inplace.
+
+    Args:
+        filepath (str | Path): Path to the JSON data file.
+        normalize (bool, optional): Normalization flag enabled/disabled.
+            Defaults to True.
+
+    Returns:
+        dict[str, Any]: Parsed JSON payload, normalized or not.
+    """
+    return normalize_keys(load_json_file(filepath)) if normalize else \
+        load_json_file(filepath)
 
 def load_json_file(filepath: str | Path) -> dict[str, Any]:
     """Read a JSON pattern file from disk.
