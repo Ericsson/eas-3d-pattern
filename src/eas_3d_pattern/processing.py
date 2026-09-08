@@ -14,22 +14,26 @@ not meant to be instantiated on its own; it extends
 :class:`~eas_3d_pattern.ngmn.metadata.Metadata` because every input it needs is
 a metadata accessor.
 
-.. todo::
-    ``_process_pattern_data`` was moved here unchanged and still does five
-    separable jobs: branching on the sampling format and assembling the grid,
-    deriving field components (dB to linear, complex E-fields, total power from
-    Co/Cr), building the dataset and its attributes, dispatching the coordinate
-    transform, and reporting grid irregularity. Only the first of those is
-    NGMN-format-specific and only the second is antenna mathematics, so this
-    module currently straddles the ``ngmn`` / ``metrics`` boundary drawn
-    elsewhere in the package. Decomposing it is deliberately deferred: it is the
-    least-covered, highest-risk code in the class and warranted its own step.
+``_process_pattern_data`` orchestrates the assembly in five steps, each a
+focused helper: assembling the sampling grid (``_get_pattern_from_uniform_sampling``
+for the uniform branch), deriving field components (``_derive_field_components`` —
+dB to linear, complex E-fields, total power from Co/Cr), building the dataset and
+its attributes (``_build_dataset``), dispatching the coordinate transform
+(``_apply_coordinate_transform``) and reporting grid irregularity
+(``_warn_on_irregular_grid``).
+
+.. note::
+    Only grid assembly is NGMN-format-specific and only component derivation is
+    antenna mathematics, so this module still straddles the ``ngmn`` / ``metrics``
+    boundary drawn elsewhere in the package. A cleaner home for those two concerns
+    is a possible future move.
 """
 
 from __future__ import annotations
 
 import logging
 import warnings
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -40,6 +44,7 @@ from eas_3d_pattern.ngmn.coordinates import (
     to_internal_frame,
 )
 from eas_3d_pattern.ngmn.metadata import Metadata
+from eas_3d_pattern.util_func.guards import verify
 
 logger = logging.getLogger(__name__)
 
@@ -79,51 +84,81 @@ class PatternProcessing(Metadata):
         )
         return self.pattern
 
-    def _process_pattern_data(self) -> xr.Dataset:
-        """Process the raw data during __init__.
+    @staticmethod
+    def _get_pattern_from_uniform_sampling(
+        theta_sampling: np.ndarray | None,
+        phi_sampling: np.ndarray | None,
+        raw_pattern: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Lay uniformly-sampled pattern rows onto their (Theta, Phi) grid.
 
-        Processes the JSON antenna pattern data into the a standardized format to use methods like plotting or beam efficiency calculations.
+        Args:
+            theta_sampling (np.ndarray | None): Theta grid vector; required for
+                uniform sampling.
+            phi_sampling (np.ndarray | None): Phi grid vector; required for uniform
+                sampling.
+            raw_pattern (pd.DataFrame): Raw pattern rows to place onto the grid.
+
+        Returns:
+            pd.DataFrame: ``raw_pattern`` with prepended ``Theta`` and ``Phi``
+            coordinate columns.
+
+        Raises:
+            AssertionError: If a sampling grid is missing (an internal invariant
+                that uniform sampling should already guarantee).
+            ValueError: If the number of rows does not match the number of grid
+                points.
         """
-        if (
-            self.is_uniform_sampling
-            and self.theta_sampling is not None
-            and self.phi_sampling is not None
-        ):
-            X, Y = np.meshgrid(self.theta_sampling, self.phi_sampling, indexing="ij")
-            coords = np.column_stack([X.ravel(order="C"), Y.ravel(order="C")])
-            pattern_data = self.raw_pattern_dataframe
-            if len(pattern_data) != len(coords):
-                logger.error(
-                    f"Number of sampling points n={len(coords)} does not equal pattern data m={len(pattern_data)}. Could not construct dataframe."
-                )
-                raise ValueError(
-                    f"Number of sampling points n={len(coords)} does not equal pattern data m={len(pattern_data)}. Could not construct dataframe."
-                )
-            pattern_data = pd.concat(
-                [pd.DataFrame(coords, columns=["Theta", "Phi"]), pattern_data], axis=1
-            )
-        elif not self.is_uniform_sampling:
-            pattern_data = self.raw_pattern_dataframe
-        else:
-            logger.error("AntennaPattern: No uniform or nonuniform sampling detected.")
-            raise ValueError(
-                "AntennaPattern: No uniform or nonuniform sampling detected."
-            )
+        verify(theta_sampling is not None,
+               "Uniform sampling requires theta sampling to be provided",
+               AssertionError)
+        verify(phi_sampling is not None,
+               "Uniform sampling requires phi sampling to be provided",
+               AssertionError)
+        # verify() has guaranteed both grids are non-None at runtime; cast lets
+        # mypy drop the None arm that it cannot narrow through the guard.
+        X, Y = np.meshgrid(
+            cast("np.ndarray", theta_sampling),
+            cast("np.ndarray", phi_sampling),
+            indexing="ij",
+        )
+        coords = np.column_stack([X.ravel(order="C"), Y.ravel(order="C")])
+        verify(len(raw_pattern) == len(coords),
+               f"Number of sampling points n={len(coords)} does not equal pattern data m={len(raw_pattern)}. Could not construct dataframe.")
+        return pd.concat(
+            [pd.DataFrame(coords, columns=["Theta", "Phi"]), raw_pattern], axis=1
+        )
 
-        # construct the dataset
-        for field_name in COMPONENT_COLUMNS:
-            if field_name not in pattern_data.columns:
-                pattern_data[field_name] = np.nan
+    @staticmethod
+    def _derive_field_components(pattern_data: pd.DataFrame) -> pd.DataFrame:
+        """Derive linear/dB powers, complex E-fields and total power on the frame.
+
+        Fills any absent NGMN component column with NaN, converts the Co/Cr
+        magnitudes to linear power and complex E-fields, and sets total power
+        either from a declared ``MagAttenuationTP`` column or, when that column is
+        absent, by reconstructing it from the Co/Cr components.
+
+        Args:
+            pattern_data (pd.DataFrame): Frame carrying the raw NGMN component
+                columns (a subset of ``COMPONENT_COLUMNS``).
+
+        Returns:
+            pd.DataFrame: The same frame with the derived power, phase, E-field and
+            total-power columns added.
+        """
+        # Ensure dataset columns
+        missing_components = pd.Index(COMPONENT_COLUMNS).difference(pattern_data.columns)
+        pattern_data[missing_components] = np.nan
+
         pattern_data["P_co_dB"] = -pattern_data["MagAttenuationCo"]
         pattern_data["P_cr_dB"] = -pattern_data["MagAttenuationCr"]
         pattern_data["P_co_lin"] = 10 ** (pattern_data["P_co_dB"] / 10)
         pattern_data["P_cr_lin"] = 10 ** (pattern_data["P_cr_dB"] / 10)
-        pattern_data["Phase_co_rad"] = np.deg2rad(pattern_data["PhaseCo"])
-        pattern_data["Phase_cr_rad"] = np.deg2rad(pattern_data["PhaseCr"])
-        if pattern_data["Phase_co_rad"].isna().any():
-            pattern_data["Phase_co_rad"] = np.zeros(pattern_data["Phase_co_rad"].shape)
-        if pattern_data["Phase_cr_rad"].isna().any():
-            pattern_data["Phase_cr_rad"] = np.zeros(pattern_data["Phase_cr_rad"].shape)
+        # Phase is an optional column in the NGMN schema (Data_Set cells are non-null
+        # numbers), so an absent phase column is uniformly NaN; fillna(0) sets it to zero
+        # phase, collapsing exp(1j*phase) to 1 so the E-field is its real magnitude.
+        pattern_data["Phase_co_rad"] = np.deg2rad(pattern_data["PhaseCo"]).fillna(0)
+        pattern_data["Phase_cr_rad"] = np.deg2rad(pattern_data["PhaseCr"]).fillna(0)
 
         pattern_data["E_co_complex"] = np.sqrt(pattern_data["P_co_lin"]) * np.exp(
             1j * pattern_data["Phase_co_rad"]
@@ -144,40 +179,78 @@ class PatternProcessing(Metadata):
             pattern_data["P_tp_dB"] = -pattern_data["MagAttenuationTP"]
             pattern_data["P_tp_lin"] = 10 ** (pattern_data["P_tp_dB"] / 10)
 
-        # assign index and coordinates
-        pattern_data = pattern_data.set_index(["Theta", "Phi"])
-        if pattern_data.index.duplicated().any():
-            logger.error(
-                "AntennaPattern: Duplicate (Theta, Phi) coordinate pairs found."
-            )
-            raise ValueError(
-                "AntennaPattern: Duplicate (Theta, Phi) coordinate pairs found."
-            )
-        df = pattern_data.to_xarray()
-        df = df.assign_attrs(
+        return pattern_data
+
+    def _build_dataset(self, pattern_data: pd.DataFrame) -> xr.Dataset:
+        """Convert the indexed frame to an xarray dataset with metadata attributes.
+
+        Args:
+            pattern_data (pd.DataFrame): Frame indexed by ``(Theta, Phi)`` carrying
+                the derived component columns.
+
+        Returns:
+            xr.Dataset: The pattern as a dataset, with scalar antenna metadata
+            attached as dataset attributes.
+        """
+        ds = pattern_data.to_xarray()
+        ds = ds.assign_attrs(
             gain_dbi=self.gain_dbi,
             phi_hpbw=self.phi_hpbw,
             theta_hpbw=self.theta_hpbw,
             front_to_back=self.front_to_back,
             coordinate_system=self.coordinate_system,
         )
+        return ds
 
-        # coordinate system and grid
+    def _apply_coordinate_transform(self, ds: xr.Dataset) -> xr.Dataset:
+        """Transform the dataset into the internal coordinate frame if needed.
+
+        Args:
+            ds (xr.Dataset): Pattern dataset in its declared coordinate system.
+
+        Returns:
+            xr.Dataset: The dataset in ``DEFAULT_INTERNAL_COORD_SYSTEM``, transformed
+            only when the declared system differs.
+        """
         if self.coordinate_system != DEFAULT_INTERNAL_COORD_SYSTEM:
             logger.warning(
-                f"AntennaPattern: Coordinate system {self.coordinate_system} not used for calculations. Transforming 'pattern' attribute to {DEFAULT_INTERNAL_COORD_SYSTEM}."
+                f"AntennaPattern: Coordinate system {self.coordinate_system} detected. Transforming to {DEFAULT_INTERNAL_COORD_SYSTEM}."
             )
-            df = to_internal_frame(
-                df, self.coordinate_system, DEFAULT_INTERNAL_COORD_SYSTEM
-            )
-        dTheta = np.diff(df["Theta"])
-        dPhi = np.diff(df["Phi"])
-        if len(np.unique(dTheta)) != 1:
-            logger.warning(
-                "AntennaPattern: Non-uniform gridded data detected in Theta. Calculations might misbehave."
-            )
-        if len(np.unique(dPhi)) != 1:
-            logger.warning(
-                "AntennaPattern: Non-unfirom gridded data detected in Phi. Calculations might misbehave."
-            )
-        return df
+            ds = to_internal_frame(ds, self.coordinate_system, DEFAULT_INTERNAL_COORD_SYSTEM)
+        return ds
+
+    @staticmethod
+    def _warn_on_irregular_grid(ds: xr.Dataset) -> None:
+        """Warn when the Theta or Phi grid spacing is not uniform.
+
+        Args:
+            ds (xr.Dataset): Pattern dataset indexed by ``Theta`` and ``Phi``.
+        """
+        for axis in ("Theta", "Phi"):
+            if len(np.unique(np.diff(ds[axis]))) != 1:
+                logger.warning(
+                    "AntennaPattern: Non-uniform gridded data detected in %s. Calculations might misbehave.",
+                    axis,
+                )
+
+    def _process_pattern_data(self) -> xr.Dataset:
+        """Process the raw data during __init__.
+
+        Processes the JSON antenna pattern data into a standardized format to use methods like plotting or beam efficiency calculations.
+        """
+        pattern_data = self.raw_pattern_dataframe if not self.is_uniform_sampling else \
+                        self._get_pattern_from_uniform_sampling(self.theta_sampling,
+                                                                self.phi_sampling,
+                                                                self.raw_pattern_dataframe)
+
+        pattern_data = self._derive_field_components(pattern_data)
+
+        # assign index and coordinates
+        pattern_data = pattern_data.set_index(["Theta", "Phi"])
+        verify(not pattern_data.index.duplicated().any(),
+               "AntennaPattern: Duplicate (Theta, Phi) coordinate pairs found.")
+
+        ds = self._build_dataset(pattern_data)
+        ds = self._apply_coordinate_transform(ds)
+        self._warn_on_irregular_grid(ds)
+        return ds

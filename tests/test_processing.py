@@ -13,9 +13,9 @@ module (plan section 2.1.3), pinning its remaining uncovered branches: the
 sampling/row count mismatch, duplicate coordinate pairs, and the irregular-grid
 warnings.
 
-The ``else`` branch raising "No uniform or nonuniform sampling detected" is
-covered by ``TestUnreachableSamplingBranch`` below, which documents why it cannot
-be triggered rather than fabricating the state.
+The uniform-sampling grid guards (``verify(..., AssertionError)``) protect an
+internal invariant that no input can violate; ``TestUniformSamplingInvariant``
+below documents why rather than fabricating the impossible state.
 """
 
 from __future__ import annotations
@@ -108,23 +108,27 @@ class TestIrregularGridWarnings:
         assert not [r for r in caplog.records if "gridded data detected" in r.message]
 
 
-class TestUnreachableSamplingBranch:
-    """The 'No uniform or nonuniform sampling detected' branch cannot be reached.
+class TestUniformSamplingInvariant:
+    """The uniform-sampling grid guards cannot fire in practice.
 
-    The dispatch is::
+    The dispatch is now::
 
-        if is_uniform_sampling and theta_sampling is not None and phi_sampling is not None:
-        elif not is_uniform_sampling:
-        else:  # <- unreachable
+        if is_uniform_sampling:
+            verify(theta_sampling is not None, ..., AssertionError)
+            verify(phi_sampling is not None, ..., AssertionError)
+            ...  # build the meshgrid
+        else:
+            ...  # non-uniform: coordinates carried on each row
 
     ``is_uniform_sampling`` is ``bool(Theta_Sampling and Phi_Sampling)`` and
     ``theta_sampling`` returns ``None`` exactly when ``Theta_Sampling`` is falsy, so a
-    true ``is_uniform_sampling`` guarantees both accessors are non-``None``. The
-    ``elif`` then absorbs every remaining case. Malformed triples raise from
-    ``np.arange`` or indexing rather than yielding ``None``.
+    true ``is_uniform_sampling`` guarantees both accessors are non-``None``. The two
+    ``verify(..., AssertionError)`` guards therefore protect an internal invariant that
+    cannot be violated through any input; malformed triples raise from ``np.arange`` or
+    indexing rather than yielding ``None``.
 
-    This test documents the invariant instead of fabricating an impossible object;
-    the branch is left in place pending a decision on removing it as dead code.
+    These tests document the invariant instead of fabricating an impossible object; the
+    guards are kept for the type narrowing they express and as executable documentation.
     """
 
     def test_uniform_sampling_implies_both_accessors_present(self, pattern_path):
