@@ -27,6 +27,8 @@ import logging
 import numpy as np
 import xarray as xr
 
+from eas_3d_pattern.util_func.guards import verify
+
 logger = logging.getLogger(__name__)
 
 #: Component holding the total-power pattern in dB.
@@ -51,14 +53,14 @@ def component_name(power: bool) -> str:
     return POWER_COMPONENT if power else COPOLAR_COMPONENT
 
 
-def find_peak(pattern_3d: xr.Dataset, power: bool = False) -> tuple[float, float]:
+def find_peak(pattern: xr.Dataset, power: bool = False) -> tuple[float, float]:
     """Find the Theta/Phi coordinates of the pattern peak.
 
     Searches for the maximum value within the pattern data array. If two points
     represent a maximum value, the first one is returned.
 
     Args:
-        pattern_3d (xr.Dataset): Processed pattern dataset.
+        pattern (xr.Dataset): Processed pattern dataset.
         power (bool, optional): Whether to search the power component instead of
             the co-polarized one. Defaults to False.
 
@@ -72,22 +74,17 @@ def find_peak(pattern_3d: xr.Dataset, power: bool = False) -> tuple[float, float
     component = component_name(power)
     logger.debug(f"AntennaPattern: Searching for peak of component {component}")
     peak_tuple = (
-        pattern_3d.stack(pt=("Theta", "Phi")).idxmax("pt")[component].values.item()
+        pattern.stack(pt=("Theta", "Phi")).idxmax("pt")[component].values.item()
     )
-    if not isinstance(peak_tuple, tuple):
-        logger.error(
-            "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data."
-        )
-        raise ValueError(
-            "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data."
-        )
+    verify(isinstance(peak_tuple, tuple),
+           "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data.")
     theta_val_peak, phi_val_peak = peak_tuple
     logger.debug(f"AntennaPattern: Peak coordinates found: {peak_tuple}")
     return theta_val_peak, phi_val_peak
 
 
 def top_3db_border(
-    pattern_3d: xr.Dataset,
+    pattern: xr.Dataset,
     theta_peak: float,
     phi_peak: float,
     power: bool = False,
@@ -98,7 +95,7 @@ def top_3db_border(
     reported above -3 dB, advanced by one theta grid step.
 
     Args:
-        pattern_3d (xr.Dataset): Processed pattern dataset.
+        pattern (xr.Dataset): Processed pattern dataset.
         theta_peak (float): Theta coordinate of the beam peak, in degrees.
         phi_peak (float): Phi coordinate of the beam peak, in degrees.
         power (bool, optional): Whether to cut the power component instead of the
@@ -107,7 +104,7 @@ def top_3db_border(
     Returns:
         float: Theta border for the top 3 dB point in degrees.
     """
-    vertical_cut = pattern_3d.sel(Phi=phi_peak)
+    vertical_cut = pattern.sel(Phi=phi_peak)
     vertical_cut_normed = vertical_cut[component_name(power)]
 
     # Fallback: if no point at/below -3 dB exists above the peak (e.g. a very
