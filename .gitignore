@@ -185,3 +185,4 @@ plan.md
 tests/fixtures/*-actual.png
 tests/fixtures/*-failed-diff.png
 .trash/
+trashcan/

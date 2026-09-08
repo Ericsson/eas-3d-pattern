@@ -4,7 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from .parser import AntennaPattern
 from .sample_data import SAMPLE_JSON
 from .schema_manager import NGMNSchema, SchemaSource
-from .sector_definitions import SectorDefinition
+from .sector import SectorDefinition
 from .util_func.report import generate_report_eas
 
 LIBRARY_PACKAGE_NAME = __name__

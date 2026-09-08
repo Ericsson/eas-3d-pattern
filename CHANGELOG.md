@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The sector code moved from the single `sector_definitions.py` module into a
+  `sector/` package: `sector.definitions` (the `BoundaryBox` region and the `Sector`
+  collection), `sector.presets` (the `SectorPreset` base and the `from_preset` /
+  `preset_names` / `validate_preset` registry helpers), and one module per preset
+  (`sector.eas_preset.EasPreset`, `sector.ngmn_type_a_preset.NgmnTypeAPreset`). Presets
+  are now `SectorPreset` subclasses with a `load()` method rather than free builder
+  functions. The public names (`SectorDefinition`, `BoundaryBoxSquare`) remain importable
+  from `eas_3d_pattern` unchanged; `BoundaryBox`, `Sector`, and the preset helpers are new
+  public names exported from `eas_3d_pattern.sector`.
+
 - Internal refactor (no public API change): the `AntennaPattern` god class was decomposed.
   Logic moved out of `parser.py` (1140 → 422 lines) into `ngmn/` (`loader`, `coordinates`,
   `metadata`) and `metrics/` (`directivity`, `efficiency`, `peak`, `quadrature`) sub-packages,
@@ -84,6 +94,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- `BoundaryBoxSquare` is renamed to `BoundaryBox` (the "Square" suffix was
+  redundant). `BoundaryBoxSquare` remains as an alias for backward compatibility and
+  is scheduled for removal in a future release; use `BoundaryBox` instead. The class
+  also no longer carries a `name` field: a box is a pure geometry value object, and
+  the owning `Sector`/`SectorDefinition` names it via its dict key.
+
+- The `SectorDefinition(load_default=..., top_border=...)` constructor path is
+  deprecated in favour of the preset builder
+  `SectorDefinition.from_preset("eas", top_border=...)` (for the EAS sectors) or
+  `SectorDefinition(load_default=False)` (for an empty instance). **This is not a
+  breaking change: the constructor still works exactly as before.** `load_default`
+  still defaults to `True` and still requires `top_border`, so existing calls keep
+  their current behaviour; they now additionally emit a `DeprecationWarning`
+  pointing at the replacement. The EAS sector geometry has moved out of
+  `SectorDefinition` into the `eas` preset builder, and the deprecated path simply
+  delegates to it, so the loaded sectors are identical. The `load_default` /
+  `top_border` parameters are scheduled for removal in a future release, at which
+  point `SectorDefinition()` will construct an empty instance.
 - `AntennaPattern.Pattern_3D` is now a deprecated read-only alias for
   `AntennaPattern.pattern` and emits a `DeprecationWarning`. It returns the same
   `xarray.Dataset` object as `pattern` (not a copy). Scheduled for removal in a

@@ -28,7 +28,7 @@ from __future__ import annotations
 import pytest
 
 from eas_3d_pattern import AntennaPattern, SectorDefinition
-from eas_3d_pattern import sector_definitions as sector_definitions_module
+from eas_3d_pattern.sector import presets as presets_module
 
 
 def full_sphere_sectors() -> SectorDefinition:
@@ -88,14 +88,18 @@ class TestExternallyRegisteredPreset:
     def test_external_preset_is_dispatched(self, pattern_path, monkeypatch):
         """A preset that is neither eas nor Type A falls through to from_preset().
 
-        The fallback takes no pattern-derived arguments, so the builder must be
-        callable with none.
+        The fallback takes no pattern-derived arguments, so the preset's load must
+        be callable with none.
         """
-        registry = dict(sector_definitions_module._PRESET_REGISTRY)
-        registry["whole-sphere"] = full_sphere_sectors
-        monkeypatch.setattr(
-            sector_definitions_module, "_PRESET_REGISTRY", registry, raising=True
-        )
+        class _WholeSpherePreset(presets_module.SectorPreset):
+            name = "whole-sphere"
+
+            def load(self, **_kwargs):
+                return full_sphere_sectors()
+
+        registry = dict(presets_module._REGISTRY)
+        registry["whole-sphere"] = _WholeSpherePreset()
+        monkeypatch.setattr(presets_module, "_REGISTRY", registry, raising=True)
 
         pattern = AntennaPattern(pattern_path(), validate=False)
         pattern.sector_preset = "whole-sphere"

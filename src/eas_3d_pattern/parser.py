@@ -19,7 +19,12 @@ from eas_3d_pattern.ngmn import json_load
 from eas_3d_pattern.plotting import build_heatmap, build_polar_3d
 from eas_3d_pattern.processing import PatternProcessing
 from eas_3d_pattern.schema_manager import NGMNSchema
-from eas_3d_pattern.sector_definitions import SectorDefinition
+from eas_3d_pattern.sector import (
+    Sector,
+    from_preset,
+    preset_names,
+    validate_preset,
+)
 from eas_3d_pattern.util_func.guards import verify
 
 logger = logging.getLogger(__name__)
@@ -83,12 +88,7 @@ class AntennaPattern(PatternProcessing):
 
     @sector_preset.setter
     def sector_preset(self, value: str) -> None:
-        available = SectorDefinition.presets()
-        if value not in available:
-            raise ValueError(
-                f"AntennaPattern: Unknown preset '{value}'. "
-                f"Available presets: {available}"
-            )
+        validate_preset(value)
         self._sector_preset = value
 
     @classmethod
@@ -105,7 +105,7 @@ class AntennaPattern(PatternProcessing):
             >>> AntennaPattern.available_sector_presets()
             ['eas', 'ngmn-v13-type-a']
         """
-        return SectorDefinition.presets()
+        return preset_names()
 
     def get_metadata_dict(self) -> dict[str, Any]:
         """Get meta data dictionary of the antenna pattern data.
@@ -167,20 +167,20 @@ class AntennaPattern(PatternProcessing):
         """
         return losses(self.pattern, self.gain_dbi)
 
-    def _build_sectors_from_preset(self) -> SectorDefinition:
-        """Build a SectorDefinition from the active preset and pattern metadata.
+    def _build_sectors_from_preset(self) -> Sector:
+        """Build a Sector from the active preset and pattern metadata.
 
         Dispatches to the correct preset builder based on ``self._sector_preset``.
 
         Returns:
-            SectorDefinition: Configured sector definition for this pattern.
+            Sector: Configured sector definition for this pattern.
 
         Raises:
             ValueError: If required metadata is missing for the selected preset.
         """
         if self._sector_preset == "eas":
             top_border = self.calculate_top_3db_point(power=False)
-            return SectorDefinition.from_preset("eas", top_border=top_border)
+            return from_preset("eas", top_border=top_border)
 
         if self._sector_preset == "ngmn-v13-type-a":
             theta_peak, _ = self.find_peak_coordinates(power=False)
@@ -191,7 +191,7 @@ class AntennaPattern(PatternProcessing):
                     "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
                 )
             phi_nominal = self.phi_electrical_pan or 0.0
-            return SectorDefinition.from_preset(
+            return from_preset(
                 "ngmn-v13-type-a",
                 theta_beam_peak=theta_peak,
                 theta_hpbw=float(theta_hpbw),
@@ -200,10 +200,10 @@ class AntennaPattern(PatternProcessing):
             )
 
         # Fallback for future presets registered externally
-        return SectorDefinition.from_preset(self._sector_preset)
+        return from_preset(self._sector_preset)
 
     def calculate_beam_efficiency(
-        self, sector_definitions: SectorDefinition | None = None, powersum: bool = True
+        self, sector_definitions: Sector | None = None, powersum: bool = True
     ) -> dict[str, float]:
         """Calculate the beam efficiency of the antenna pattern data.
 

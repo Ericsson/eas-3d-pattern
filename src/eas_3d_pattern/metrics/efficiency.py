@@ -10,7 +10,7 @@
 
 Solid-angle-weighted power fraction falling inside each declared sector. Pure
 function over the processed pattern dataset and a
-:class:`~eas_3d_pattern.sector_definitions.SectorDefinition`.
+:class:`~eas_3d_pattern.sector.SectorDefinition`.
 
 Preset *dispatch* deliberately stays on ``AntennaPattern``: choosing a preset
 requires pattern-derived inputs (the measured 3 dB border, the beam peak) that
@@ -31,7 +31,7 @@ from types import MappingProxyType
 import xarray as xr
 
 from eas_3d_pattern.metrics.quadrature import DOMEGA, ensure_domega
-from eas_3d_pattern.sector_definitions import BoundaryBoxSquare, SectorDefinition
+from eas_3d_pattern.sector import BoundaryBoxSquare, Sector
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ BOUNDARY_OPERATORS: MappingProxyType[str, Callable[[float, float], bool]] = (
 
 def beam_efficiency(
     pattern_3d: xr.Dataset,
-    sectors: SectorDefinition,
+    sectors: Sector,
     powersum: bool = True,
 ) -> dict[str, float]:
     """Calculate the beam efficiency of the antenna pattern data.
@@ -67,7 +67,7 @@ def beam_efficiency(
     Args:
         pattern_3d (xr.Dataset): Processed pattern dataset. Gains a ``dOmega``
             data variable as a side effect if it is not already present.
-        sectors (SectorDefinition): Sector boundaries to integrate over.
+        sectors (Sector): Sector boundaries to integrate over.
         powersum (bool, optional): If True, efficiency is calculated on total
             power. If False, on the co-polar pattern. Defaults to True.
 

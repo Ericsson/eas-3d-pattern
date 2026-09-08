@@ -27,7 +27,7 @@ def test_report_does_not_import_from_top_level_package():
     ]
     assert not offending, "report.py must not absolute-import the top-level package"
     assert report_mod.AntennaPattern is not None
-    assert report_mod.SectorDefinition is not None
+    assert report_mod.Sector is not None
 
 
 def test_report_uses_module_logger():
