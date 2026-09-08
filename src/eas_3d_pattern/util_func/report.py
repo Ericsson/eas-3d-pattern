@@ -301,5 +301,5 @@ def _generate_excel_report(
         df_per_arrayandsubband_per_tilt.to_excel(
             writer, index=False, sheet_name="Mean_ArrayID_Subband_Tilt"
         )
-    logger.info("Report: ✨Generated EAS BE report in %s✨", report_name)
+    logger.info("Report: Generated EAS BE report in %s", report_name)
     return None

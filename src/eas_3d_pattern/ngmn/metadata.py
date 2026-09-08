@@ -33,6 +33,75 @@ import pandas as pd
 # triple so ``np.arange`` includes the final grid point despite float rounding.
 _SAMPLING_STOP_EPSILON = 1e-6
 
+#: Multiplier from each NGMN frequency unit to hertz. An unknown unit maps to 1.0
+#: (value returned unscaled), matching the original fall-through behaviour.
+_HZ_MULTIPLIER: dict[str, float] = {
+    "Hz": 1.0,
+    "kHz": 1e3,
+    "MHz": 1e6,
+    "GHz": 1e9,
+    "THz": 1e12,
+}
+
+
+def _to_hz(value: float, unit: str) -> float:
+    """Scale a frequency value to hertz by its declared unit.
+
+    Args:
+        value (float): Frequency magnitude in ``unit``.
+        unit (str): NGMN frequency unit; an unknown unit leaves ``value`` unscaled.
+
+    Returns:
+        float: The frequency in hertz.
+    """
+    return value * _HZ_MULTIPLIER.get(unit, 1.0)
+
+
+def _to_dbm(value: float, unit: str) -> float:
+    """Convert a power value to dBm by its declared unit.
+
+    Args:
+        value (float): Power magnitude in ``unit``.
+        unit (str): NGMN power unit; an unknown unit leaves ``value`` unscaled.
+
+    Returns:
+        float: The power in dBm.
+    """
+    match unit:
+        case "mW":
+            return float(10 * np.log10(value))
+        case "W":
+            return float(10 * np.log10(value * 1000))
+        case "dBW":
+            return value + 30
+        case "dBm":
+            return value
+        case _:
+            return value
+
+
+def _to_watt(value: float, unit: str) -> float:
+    """Convert a power value to watts by its declared unit.
+
+    Args:
+        value (float): Power magnitude in ``unit``.
+        unit (str): NGMN power unit; an unknown unit leaves ``value`` unscaled.
+
+    Returns:
+        float: The power in watts.
+    """
+    match unit:
+        case "mW":
+            return value / 1000.0
+        case "W":
+            return value
+        case "dBW":
+            return float(np.pow(10, value / 10.0))
+        case "dBm":
+            return float(np.pow(10, value / 10.0) / 1000.0)
+        case _:
+            return value
+
 
 class Metadata:
     """Read-only NGMN BASTA metadata accessors over ``data``.
@@ -146,21 +215,7 @@ class Metadata:
     def frequency_hz(self) -> float:
         """Operating frequency normalized to hertz from any declared unit."""
         freq_dict = self.data["Frequency"]
-        val = float(freq_dict.get("value"))
-        unit = freq_dict.get("unit", "")
-        match unit:
-            case "Hz":
-                return val
-            case "kHz":
-                return val * 1e3
-            case "MHz":
-                return val * 1e6
-            case "GHz":
-                return val * 1e9
-            case "THz":
-                return val * 1e12
-            case _:
-                return val
+        return _to_hz(float(freq_dict.get("value")), freq_dict.get("unit", ""))
 
     @property
     def frequency_range(self) -> list[float] | None:
@@ -168,24 +223,11 @@ class Metadata:
         freq_range_dict = self.data.get("Frequency_Range")
         if not freq_range_dict:
             return None
-        freq_range_list = [
-            float(freq_range_dict.get("lower")),
-            float(freq_range_dict.get("upper")),
-        ]
         unit = freq_range_dict.get("unit", "")
-        match unit:
-            case "Hz":
-                return freq_range_list
-            case "kHz":
-                return [v * 1e3 for v in freq_range_list]
-            case "MHz":
-                return [v * 1e6 for v in freq_range_list]
-            case "GHz":
-                return [v * 1e9 for v in freq_range_list]
-            case "THz":
-                return [v * 1e12 for v in freq_range_list]
-            case _:
-                return freq_range_list
+        return [
+            _to_hz(float(freq_range_dict.get("lower")), unit),
+            _to_hz(float(freq_range_dict.get("upper")), unit),
+        ]
 
     @property
     def eirp_dbm(self) -> float | None:
@@ -193,19 +235,7 @@ class Metadata:
         EIRP_dict = self.data.get("EIRP")
         if not EIRP_dict:
             return None
-        val = float(EIRP_dict.get("value"))
-        unit = EIRP_dict.get("unit", "")
-        match unit:
-            case "mW":
-                return float(10 * np.log10(val))
-            case "W":
-                return float(10 * np.log10(val * 1000))
-            case "dBW":
-                return float(val + 30)
-            case "dBm":
-                return val
-            case _:
-                return val
+        return _to_dbm(float(EIRP_dict.get("value")), EIRP_dict.get("unit", ""))
 
     @property
     def output_power_watt(self) -> float | None:
@@ -213,19 +243,10 @@ class Metadata:
         configured_output_power = self.data.get("Configured_Output_Power")
         if not configured_output_power:
             return None
-        val = float(configured_output_power.get("value"))
-        unit = configured_output_power.get("unit", "")
-        match unit:
-            case "mW":
-                return val / 1000.0
-            case "W":
-                return val
-            case "dBW":
-                return float(np.pow(10, val / 10.0))
-            case "dBm":
-                return float(np.pow(10, val / 10.0) / 1000.0)
-            case _:
-                return val
+        return _to_watt(
+            float(configured_output_power.get("value")),
+            configured_output_power.get("unit", ""),
+        )
 
     @property
     def gain_dbi(self) -> float | None:

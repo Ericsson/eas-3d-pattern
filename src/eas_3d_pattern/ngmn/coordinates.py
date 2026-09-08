@@ -24,6 +24,8 @@ import logging
 import numpy as np
 import xarray as xr
 
+from eas_3d_pattern.util_func.guards import verify
+
 logger = logging.getLogger(__name__)
 
 #: Coordinate systems named by the NGMN BASTA specification, plus the internal frame.
@@ -82,21 +84,12 @@ def to_internal_frame(
         ``SPCS_Ericsson`` uses the same coordinate system as ``SPCS_Polar``, however
         phi is defined between -180 and 179.
     """
-    if to_system != DEFAULT_INTERNAL_COORD_SYSTEM:
-        logger.error(
-            f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default ({DEFAULT_INTERNAL_COORD_SYSTEM}) for now."
-        )
-        raise NotImplementedError(
-            f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default ({DEFAULT_INTERNAL_COORD_SYSTEM}) for now."
-        )
+    verify(to_system == DEFAULT_INTERNAL_COORD_SYSTEM,
+           f"Antenna Pattern: Change to coordinate system {to_system} not implemented yet. Use the default ({DEFAULT_INTERNAL_COORD_SYSTEM}) for now.",
+           NotImplementedError)
     transformable_systems = tuple(_TO_ERICSSON)
-    if from_system not in _TO_ERICSSON:
-        logger.error(
-            f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
-        )
-        raise ValueError(
-            f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}."
-        )
+    verify(from_system in _TO_ERICSSON,
+           f"AntennaPattern: Unsupported source coordinate system '{from_system}'. Expected one of {transformable_systems}.")
 
     phi = pattern_3d.coords["Phi"].values
     theta = pattern_3d.coords["Theta"].values
@@ -127,20 +120,10 @@ def _reject_out_of_range(pattern_3d: xr.Dataset, from_system: str) -> None:
     """
     theta_min, theta_max = THETA_RANGE_DEG
     new_theta = pattern_3d.coords["Theta"].values
-    if new_theta.min() < theta_min or new_theta.max() > theta_max:
-        logger.error(
-            f"AntennaPattern: Transformed theta out of range [{theta_min}, {theta_max}] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-        )
-        raise ValueError(
-            f"AntennaPattern: Transformed theta out of range [{theta_min}, {theta_max}] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-        )
+    verify(new_theta.min() >= theta_min and new_theta.max() <= theta_max,
+           f"AntennaPattern: Transformed theta out of range [{theta_min}, {theta_max}] ([{new_theta.min()}, {new_theta.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system.")
 
     phi_min, phi_max = PHI_RANGE_DEG
     new_phi = pattern_3d.coords["Phi"].values
-    if new_phi.min() < phi_min or new_phi.max() > phi_max:
-        logger.error(
-            f"AntennaPattern: Transformed phi out of range [{phi_min}, {phi_max}] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-        )
-        raise ValueError(
-            f"AntennaPattern: Transformed phi out of range [{phi_min}, {phi_max}] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system."
-        )
+    verify(new_phi.min() >= phi_min and new_phi.max() <= phi_max,
+           f"AntennaPattern: Transformed phi out of range [{phi_min}, {phi_max}] ([{new_phi.min()}, {new_phi.max()}]) converting from '{from_system}'. Input data is likely out of spec for that system.")
