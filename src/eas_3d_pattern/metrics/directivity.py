@@ -19,11 +19,13 @@ section 2.1.3).
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 import numpy as np
 import xarray as xr
 
 from eas_3d_pattern.metrics.quadrature import DOMEGA, ensure_domega
+from eas_3d_pattern.util_func.guards import verify
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,6 @@ def losses(pattern_3d: xr.Dataset, gain_dbi: float | None) -> float:
         float: The loss value in dB (gain - directivity).
     """
     logger.debug("AntennaPattern: Calculating losses of antenna pattern data.")
-    if gain_dbi is None:
-        raise ValueError(
-            "AntennaPattern: Loss can only be calculated if 'Gain' is available in the header"
-        )
-    return float(gain_dbi - directivity(pattern_3d))
+    verify(gain_dbi is not None, "AntennaPattern: 'Gain' not provided, it's required.")
+    # verify() guarantees gain_dbi is non-None; cast narrows for mypy.
+    return float(cast("float", gain_dbi) - directivity(pattern_3d))

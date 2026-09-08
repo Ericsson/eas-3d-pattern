@@ -2,7 +2,7 @@ import io
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import plotly.graph_objects as go
@@ -183,20 +183,18 @@ class AntennaPattern(PatternProcessing):
             return from_preset("eas", top_border=top_border)
 
         if self._sector_preset == "ngmn-v13-type-a":
-            theta_peak, _ = self.find_peak_coordinates(power=False)
+            theta_peak, _ = self.find_peak_coordinates()
             theta_hpbw = self.data.get("Theta_HPBW")
             phi_hpbw = self.data.get("Phi_HPBW")
-            if theta_hpbw is None or phi_hpbw is None:
-                raise ValueError(
-                    "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
-                )
+            verify(theta_hpbw is not None, "'Theta_HPBW' not in the pattern metadata, required for NGMN type A.")
+            verify(phi_hpbw is not None, "'Phi_HPBW' not in the pattern metadata, required for NGMN type A.")
             phi_nominal = self.phi_electrical_pan or 0.0
             return from_preset(
                 "ngmn-v13-type-a",
                 theta_beam_peak=theta_peak,
-                theta_hpbw=float(theta_hpbw),
+                theta_hpbw=float(cast("float", theta_hpbw)),
                 phi_nominal_direction=phi_nominal,
-                nominal_sector_phi=float(phi_hpbw),
+                nominal_sector_phi=float(cast("float", phi_hpbw)),
             )
 
         # Fallback for future presets registered externally
