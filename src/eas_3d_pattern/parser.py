@@ -727,18 +727,26 @@ class AntennaPattern:
         if self._sector_preset == "ngmn-v13-type-a":
             theta_peak, _ = self.find_peak_coordinates(power=False)
             theta_hpbw = self.raw_data.get("Theta_HPBW")
-            phi_hpbw = self.raw_data.get("Phi_HPBW")
-            if theta_hpbw is None or phi_hpbw is None:
+            if theta_hpbw is None:
                 raise ValueError(
-                    "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' and 'Phi_HPBW' in the pattern metadata."
+                    "AntennaPattern: NGMN Type A preset requires 'Theta_HPBW' in the pattern metadata."
                 )
             phi_nominal = self.phi_electrical_pan or 0.0
+            nominal_sector_phi = self.raw_data.get("Nominal_Sector_Phi")
+            if nominal_sector_phi is None:
+                logger.warning(
+                    "Nominal_Sector_Phi not found in pattern metadata, "
+                    "using NGMN default of 120.0°."
+                )
+                # NGMN BASTA V13.0 §7.3.2: 120° is the standard nominal sector
+                # for a three-sector macro deployment.
+                nominal_sector_phi = 120.0
             return SectorDefinition.from_preset(
                 "ngmn-v13-type-a",
                 theta_beam_peak=theta_peak,
                 theta_hpbw=float(theta_hpbw),
                 phi_nominal_direction=phi_nominal,
-                nominal_sector_phi=float(phi_hpbw),
+                nominal_sector_phi=float(nominal_sector_phi),
             )
 
         # Fallback for future presets registered externally
