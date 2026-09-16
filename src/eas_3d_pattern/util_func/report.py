@@ -76,10 +76,11 @@ def generate_report_eas(
         ... )  # with own subband
     """
     input_directory = Path(input_directory)
+    output_directory = Path(output_directory)
+
     files = list(input_directory.glob("*.[jJ][sS][oO][nN]"))
     if len(files) == 0:
-        raise ValueError("Report: No .json files found in the directory.")
-    output_directory = Path(output_directory)
+        raise ValueError(f"Report: No .json files found in the input directory: {input_directory}")
     output_directory.mkdir(parents=True, exist_ok=True)
 
     df_list: list[pd.DataFrame] = []
