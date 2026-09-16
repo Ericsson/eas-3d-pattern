@@ -47,6 +47,7 @@ def ensure_domega(pattern_3d: xr.Dataset) -> None:
     if DOMEGA in pattern_3d.data_vars:
         return
 
+    # The transpose operation for 1D vectors has no effect
     weight = np.repeat(
         np.sin(np.deg2rad(pattern_3d.Theta.values)).T[:, None],
         len(pattern_3d.Phi),
