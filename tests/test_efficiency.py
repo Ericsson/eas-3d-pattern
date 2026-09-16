@@ -17,7 +17,7 @@ that were previously uncovered:
 * the NGMN Type A guard for missing HPBW metadata,
 * the fallback path for externally registered presets,
 * ``powersum=False``, which integrates the co-polar component,
-* the type guard rejecting non-``BoundaryBoxSquare`` sectors.
+* the type guard rejecting non-``BoundaryBox`` sectors.
 
 NGMN Type A sector *geometry* is covered in ``test_ngmn_sectors.py``; this module
 covers the efficiency computation and preset dispatch around it.
@@ -27,13 +27,14 @@ from __future__ import annotations
 
 import pytest
 
-from eas_3d_pattern import AntennaPattern, SectorDefinition
+from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.sector import Sector
 from eas_3d_pattern.sector import presets as presets_module
 
 
-def full_sphere_sectors() -> SectorDefinition:
+def full_sphere_sectors() -> Sector:
     """A single sector spanning the whole sphere, so efficiency must be 1.0."""
-    sectors = SectorDefinition(load_default=False)
+    sectors = Sector()
     sectors.add_sector(
         name="all",
         theta_min=(0.0, "<="),

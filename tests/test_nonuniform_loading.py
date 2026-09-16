@@ -65,8 +65,11 @@ class TestNoSelfInflictedDeprecationWarning:
 
     ``_process_pattern_data`` used to test the non-uniform branch via
     ``is_nonuniform_sampling``, which was deprecated in Phase 2c. That made every
-    non-uniform load raise a DeprecationWarning about an API the caller never
+    non-uniform load raise a deprecation warning about an API the caller never
     touched. Internal code must use ``not is_uniform_sampling`` instead.
+
+    Both categories are checked: the library emits ``FutureWarning`` for its own
+    deprecations, while dependencies may still use ``DeprecationWarning``.
     """
 
     def test_nonuniform_load_is_warning_free(self, nonuniform_pattern_path):
@@ -75,7 +78,9 @@ class TestNoSelfInflictedDeprecationWarning:
             warnings.simplefilter("always")
             AntennaPattern(path, validate=False)
 
-        deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        deprecations = [
+            w for w in caught if issubclass(w.category, DeprecationWarning | FutureWarning)
+        ]
         assert not deprecations, [str(w.message) for w in deprecations]
 
     def test_uniform_load_is_warning_free(self, pattern_path):
@@ -84,5 +89,7 @@ class TestNoSelfInflictedDeprecationWarning:
             warnings.simplefilter("always")
             AntennaPattern(path, validate=False)
 
-        deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        deprecations = [
+            w for w in caught if issubclass(w.category, DeprecationWarning | FutureWarning)
+        ]
         assert not deprecations, [str(w.message) for w in deprecations]

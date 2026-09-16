@@ -117,13 +117,13 @@ class TestRawDataDeprecatedAlias:
     def test_raw_data_returns_same_object_as_data(self, pattern_path):
         """The alias returns the very same dict object, not a copy."""
         pattern = AntennaPattern(pattern_path(), validate=False)
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             assert pattern.raw_data is pattern.data
 
     def test_raw_data_access_warns(self, pattern_path):
-        """Reading ``raw_data`` emits a DeprecationWarning naming ``data``."""
+        """Reading ``raw_data`` emits a FutureWarning naming ``data``."""
         pattern = AntennaPattern(pattern_path(), validate=False)
-        with pytest.warns(DeprecationWarning, match="(?i)use antennapattern.data"):
+        with pytest.warns(FutureWarning, match="(?i)use antennapattern.data"):
             _ = pattern.raw_data
 
 
@@ -133,13 +133,13 @@ class TestPattern3DDeprecatedAlias:
     def test_pattern_3d_returns_same_object_as_pattern(self, pattern_path):
         """The alias returns the very same dataset object, not a copy."""
         pattern = AntennaPattern(pattern_path(), validate=False)
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             assert pattern.Pattern_3D is pattern.pattern
 
     def test_pattern_3d_access_warns(self, pattern_path):
-        """Reading ``Pattern_3D`` emits a DeprecationWarning naming ``pattern``."""
+        """Reading ``Pattern_3D`` emits a FutureWarning naming ``pattern``."""
         pattern = AntennaPattern(pattern_path(), validate=False)
-        with pytest.warns(DeprecationWarning, match="(?i)use antennapattern.pattern"):
+        with pytest.warns(FutureWarning, match="(?i)use antennapattern.pattern"):
             _ = pattern.Pattern_3D
 
 

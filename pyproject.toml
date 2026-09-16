@@ -173,6 +173,10 @@ markers = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
+    # The library's own deprecations are FutureWarning (visible to end users by
+    # default). Promote them to errors so internal code and tests cannot quietly
+    # depend on a deprecated entry point; assert them with pytest.warns instead.
+    "error::FutureWarning",
 ]
 
 [tool.mypy]

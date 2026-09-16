@@ -294,7 +294,7 @@ class TestSamplingMetadata:
 
     def test_is_nonuniform_sampling_warns_and_negates(self, pattern_path):
         pattern = AntennaPattern(pattern_path(), validate=False)
-        with pytest.warns(DeprecationWarning, match="is_nonuniform_sampling"):
+        with pytest.warns(FutureWarning, match="is_nonuniform_sampling"):
             result = pattern.is_nonuniform_sampling
         assert result is False
         assert result is (not pattern.is_uniform_sampling)

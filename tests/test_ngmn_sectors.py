@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from eas_3d_pattern import AntennaPattern, SectorDefinition
+from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.sector import Sector, SectorDefinition, from_preset, preset_names
 
 
 class TestNgmnTypeABoundaries:
@@ -35,13 +36,11 @@ class TestNgmnTypeABoundaries:
             },
         )
         _ = AntennaPattern(path, validate=False)  # ensure pattern is loadable
-        sectors = SectorDefinition.from_preset(
-            "ngmn-v13-type-a",
-            theta_beam_peak=96.0,
-            theta_hpbw=7.0,
-            phi_nominal_direction=0.0,
-            nominal_sector_phi=120.0,
-        )
+        sectors = from_preset("ngmn-v13-type-a",
+        theta_beam_peak=96.0,
+        theta_hpbw=7.0,
+        phi_nominal_direction=0.0,
+        nominal_sector_phi=120.0,)
 
         service = sectors.sectors["Service"]
         assert service.theta_min[0] == pytest.approx(92.5)
@@ -59,25 +58,21 @@ class TestNgmnTypeABoundaries:
 
     def test_theta1_capped_at_90(self, pattern_path):
         """When peak - HPBW > 90, ϑ₁ = min(90, peak - HPBW) = 90."""
-        sectors = SectorDefinition.from_preset(
-            "ngmn-v13-type-a",
-            theta_beam_peak=100.0,
-            theta_hpbw=7.0,
-            phi_nominal_direction=0.0,
-            nominal_sector_phi=120.0,
-        )
+        sectors = from_preset("ngmn-v13-type-a",
+        theta_beam_peak=100.0,
+        theta_hpbw=7.0,
+        phi_nominal_direction=0.0,
+        nominal_sector_phi=120.0,)
         upper = sectors.sectors["Upper"]
         assert upper.theta_max[0] == pytest.approx(90.0)
 
     def test_phi_offset_shifts_service(self):
         """Non-zero phi_nominal_direction shifts φ₁ and φ₂."""
-        sectors = SectorDefinition.from_preset(
-            "ngmn-v13-type-a",
-            theta_beam_peak=96.0,
-            theta_hpbw=7.0,
-            phi_nominal_direction=-30.0,
-            nominal_sector_phi=120.0,
-        )
+        sectors = from_preset("ngmn-v13-type-a",
+        theta_beam_peak=96.0,
+        theta_hpbw=7.0,
+        phi_nominal_direction=-30.0,
+        nominal_sector_phi=120.0,)
         service = sectors.sectors["Service"]
         assert service.phi_min[0] == pytest.approx(-90.0)
         assert service.phi_max[0] == pytest.approx(30.0)
@@ -89,46 +84,38 @@ class TestNgmnTypeAConstraints:
     def test_theta_hpbw_below_minimum_raises(self):
         """HPBW_θ < 0.5° is outside Type A applicability."""
         with pytest.raises(ValueError, match="HPBW"):
-            SectorDefinition.from_preset(
-                "ngmn-v13-type-a",
-                theta_beam_peak=96.0,
-                theta_hpbw=0.3,
-                phi_nominal_direction=0.0,
-                nominal_sector_phi=120.0,
-            )
+            from_preset("ngmn-v13-type-a",
+            theta_beam_peak=96.0,
+            theta_hpbw=0.3,
+            phi_nominal_direction=0.0,
+            nominal_sector_phi=120.0,)
 
     def test_theta_hpbw_above_maximum_raises(self):
         """HPBW_θ > 25° is outside Type A applicability."""
         with pytest.raises(ValueError, match="HPBW"):
-            SectorDefinition.from_preset(
-                "ngmn-v13-type-a",
-                theta_beam_peak=96.0,
-                theta_hpbw=30.0,
-                phi_nominal_direction=0.0,
-                nominal_sector_phi=120.0,
-            )
+            from_preset("ngmn-v13-type-a",
+            theta_beam_peak=96.0,
+            theta_hpbw=30.0,
+            phi_nominal_direction=0.0,
+            nominal_sector_phi=120.0,)
 
     def test_sector_phi_below_minimum_raises(self):
         """NominalSector_φ < 50° is outside Type A applicability."""
         with pytest.raises(ValueError, match="[Ss]ector"):
-            SectorDefinition.from_preset(
-                "ngmn-v13-type-a",
-                theta_beam_peak=96.0,
-                theta_hpbw=7.0,
-                phi_nominal_direction=0.0,
-                nominal_sector_phi=40.0,
-            )
+            from_preset("ngmn-v13-type-a",
+            theta_beam_peak=96.0,
+            theta_hpbw=7.0,
+            phi_nominal_direction=0.0,
+            nominal_sector_phi=40.0,)
 
     def test_sector_phi_above_maximum_raises(self):
         """NominalSector_φ > 130° is outside Type A applicability."""
         with pytest.raises(ValueError, match="[Ss]ector"):
-            SectorDefinition.from_preset(
-                "ngmn-v13-type-a",
-                theta_beam_peak=96.0,
-                theta_hpbw=7.0,
-                phi_nominal_direction=0.0,
-                nominal_sector_phi=140.0,
-            )
+            from_preset("ngmn-v13-type-a",
+            theta_beam_peak=96.0,
+            theta_hpbw=7.0,
+            phi_nominal_direction=0.0,
+            nominal_sector_phi=140.0,)
 
 
 class TestNgmnTypeAPartition:
@@ -138,13 +125,11 @@ class TestNgmnTypeAPartition:
         """Sum of all sector efficiencies must be ~1.0."""
         path = pattern_path(peak_theta=96.0, peak_phi=0.0)
         pattern = AntennaPattern(path, validate=False)
-        sectors = SectorDefinition.from_preset(
-            "ngmn-v13-type-a",
-            theta_beam_peak=96.0,
-            theta_hpbw=7.0,
-            phi_nominal_direction=0.0,
-            nominal_sector_phi=120.0,
-        )
+        sectors = from_preset("ngmn-v13-type-a",
+        theta_beam_peak=96.0,
+        theta_hpbw=7.0,
+        phi_nominal_direction=0.0,
+        nominal_sector_phi=120.0,)
         eff = pattern.calculate_beam_efficiency(sector_definitions=sectors)
         total = sum(eff.values())
         assert total == pytest.approx(1.0, abs=0.02)
@@ -198,7 +183,7 @@ class TestSectorPresetProperty:
         path = pattern_path(peak_theta=96.0, peak_phi=0.0)
         pattern = AntennaPattern(path, validate=False)
         pattern.sector_preset = "ngmn-v13-type-a"
-        custom = SectorDefinition(load_default=False)
+        custom = Sector()
         custom.add_sector(
             name="MyRegion",
             theta_min=(0.0, "<="),
@@ -212,21 +197,49 @@ class TestSectorPresetProperty:
 
 
 class TestPresetRegistry:
-    """The from_preset classmethod and preset discovery."""
+    """The module-level preset helpers and preset discovery."""
 
     def test_from_preset_eas(self, pattern_path):
         """'eas' preset loads the traditional EAS sectors."""
-        sectors = SectorDefinition.from_preset("eas", top_border=85.0)
+        sectors = from_preset("eas", top_border=85.0)
         assert "Cell" in sectors.sectors
         assert "Int1" in sectors.sectors
 
     def test_from_preset_unknown_raises(self):
         """Unknown preset name raises ValueError."""
         with pytest.raises(ValueError, match="[Pp]reset"):
-            SectorDefinition.from_preset("unknown-preset")
+            from_preset("unknown-preset")
 
     def test_presets_returns_known_names(self):
-        """SectorDefinition.presets() returns available preset names."""
-        names = SectorDefinition.presets()
+        """preset_names() returns available preset names."""
+        names = preset_names()
         assert "eas" in names
         assert "ngmn-v13-type-a" in names
+
+
+class TestDeprecatedSectorDefinitionShim:
+    """The deprecated SectorDefinition still delegates, and warns while doing so."""
+
+    def test_from_preset_delegates_and_warns(self):
+        """The classmethod returns the same sectors as the module-level helper."""
+        with pytest.warns(FutureWarning, match="SectorDefinition.from_preset"):
+            sectors = SectorDefinition.from_preset("eas", top_border=85.0)
+        assert sectors.sectors.keys() == from_preset("eas", top_border=85.0).sectors.keys()
+
+    def test_presets_delegates_and_warns(self):
+        """The classmethod returns the same names as preset_names()."""
+        with pytest.warns(FutureWarning, match="SectorDefinition.presets"):
+            names = SectorDefinition.presets()
+        assert names == preset_names()
+
+    def test_validate_preset_delegates_and_warns(self):
+        """The classmethod accepts a known preset and warns."""
+        with pytest.warns(FutureWarning, match="SectorDefinition.validate_preset"):
+            SectorDefinition.validate_preset("eas")
+
+    def test_construction_warns_for_both_load_default_values(self):
+        """Every construction warns, including the empty load_default=False form."""
+        with pytest.warns(FutureWarning, match="SectorDefinition"):
+            assert SectorDefinition(load_default=False).sectors == {}
+        with pytest.warns(FutureWarning, match="SectorDefinition"):
+            assert "Cell" in SectorDefinition(load_default=True, top_border=85.0).sectors
