@@ -23,11 +23,15 @@ supplied at runtime by ``AntennaPattern.__init__``.
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
+
 
 # Small offset added to the inclusive stop of an NGMN [start, step, stop] sampling
 # triple so ``np.arange`` includes the final grid point despite float rounding.
@@ -128,10 +132,11 @@ class Metadata:
         Warns:
             DeprecationWarning: Always; ``raw_data`` is scheduled for removal.
         """
+        deprecation_warning = "AntennaPattern.raw_data is deprecated and will be removed in a future release; use AntennaPattern.data instead."
+        logger.warning(deprecation_warning)
         warnings.warn(
-            "AntennaPattern.raw_data is deprecated and will be removed in a future "
-            "release; use AntennaPattern.data instead.",
-            DeprecationWarning,
+            deprecation_warning,
+            FutureWarning, # FutureWarning instead of DeprecationWarning has been chosen because of the general expected audence of this library, which is not expected to run test suites. Tehrefore is better to provide a clear and visual deprecation warning masked through a FutureWarning.
             stacklevel=2,
         )
         return self.data
@@ -373,10 +378,11 @@ class Metadata:
             Redundant with ``not is_uniform_sampling``; scheduled for removal in a
             future release. Use ``not pattern.is_uniform_sampling`` instead.
         """
+        deprecation_warning = "is_nonuniform_sampling is deprecated and will be removed in a future release; use 'not is_uniform_sampling' instead."
+        logger.warning(deprecation_warning)
         warnings.warn(
-            "is_nonuniform_sampling is deprecated and will be removed in a future "
-            "release; use 'not is_uniform_sampling' instead.",
-            DeprecationWarning,
+            deprecation_warning,
+            FutureWarning,
             stacklevel=2,
         )
         return not self.is_uniform_sampling

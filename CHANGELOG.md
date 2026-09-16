@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loader, normalization, non-uniform loading, processing, efficiency, peak). The suite grew
   from 44 to **228 tests** and `src` statement coverage to **88%**.
   Covers metadata unit conversion, the required/optional key split, the `plot()` /
-  `plot_3D()` return contract, and — for the plots — which data array is drawn on which
-  axis, with which colour range and scale.
+  `plot_3D()` returned items , and which data array is drawn on which axis, with which 
+  colour range and scale.
 - Correctness tests for `calculate_directivity()` and `calculate_losses()`, which were
   previously at 8% and 20% statement coverage and are now fully covered. Directivity is
   verified against closed-form analytical values for isotropic, `sin^2`, `sin^4` and
@@ -61,21 +61,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING** — `AntennaPattern(data_filepath=...)` now accepts `str | pathlib.Path`
   (previously `str` only), and the stored `AntennaPattern.data_filepath` attribute is now a
-  `pathlib.Path` regardless of the input type (previously the raw `str` as passed). Code that
+  `pathlib.Path` regardless of the input type (previously the raw `str` was passed). Code that
   passed a `str` continues to work; code that read `pattern.data_filepath` and relied on it
   being a `str` (e.g. calling `str`-only methods on it) must wrap it in `str(...)` or use the
   `Path` API. Internally, `os.path` was replaced by `pathlib` in `__init__` and `__str__`.
 
-- **BREAKING** — Corrected the spelling of two misspelled public properties on
-  `AntennaPattern`. No deprecation aliases are provided; the old names are removed
-  outright.
+- **BREAKING** — Corrected the spelling of two public properties on `AntennaPattern`. 
+  No deprecation aliases are provided; the old names are removed.
 
   | Old name | New name |
   |----------|----------|
   | `AntennaPattern.phi_eletrical_pan` | `AntennaPattern.phi_electrical_pan` |
   | `AntennaPattern.theta_eletrical_tilt` | `AntennaPattern.theta_electrical_tilt` |
 
-  Migration: rename any attribute access in your own code. The underlying NGMN JSON
+  Migration: rename any attribute access. The underlying NGMN JSON
   keys (`Phi_Electrical_Pan`, `Theta_Electrical_Tilt`) were always spelled correctly
   and are unaffected, as is the output of `print(pattern)`.
 
@@ -84,9 +83,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reworded a `calculate_directivity()` docstring note for clarity.
 - Renamed the loaded-payload attribute `AntennaPattern.raw_data` to
   `AntennaPattern.data`. The payload is normalized on load (vendor key variants are
-  mapped to their canonical NGMN names), so `raw_data` was a misnomer. The old name
-  is preserved as a deprecated alias (see *Deprecated*), so existing code keeps
-  working; migrate attribute access from `pattern.raw_data` to `pattern.data`.
+  mapped to their canonical NGMN names). The old name is preserved as a deprecated 
+  alias (see *Deprecated*), so existing code keeps working; migrate attribute access 
+  from `pattern.raw_data` to `pattern.data`.
 - Renamed the processed-dataset attribute `AntennaPattern.Pattern_3D` to
   `AntennaPattern.pattern` (PEP 8 lowercase, dropped the redundant `_3D` suffix). The
   old name is preserved as a deprecated alias (see *Deprecated*); migrate attribute
@@ -95,9 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The internal Ericsson document link from the `calculate_beam_efficiency()` docstring.
-  It pointed at an eridoc URL that external users cannot reach and exposed an internal
-  document identifier in a public repository. The EAS beam-efficiency methodology will be
-  documented publicly instead (plan section 12.1 / M5-5).
+  It pointed at an eridoc URL not reachable from the outside and exposed an internal
+  document identifier in a public repository. 
+  The EAS beam-efficiency methodology will be documented publicly instead.
 
 ### Deprecated
 
@@ -123,12 +122,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```python
   # Deprecated — emits a DeprecationWarning (still works):
   sectors = SectorDefinition(load_default=True, top_border=85.0)  # EAS sectors
-  sectors = SectorDefinition(load_default=False)                  # empty instance
+  sectors = SectorDefinition(load_default=False)  # empty instance
 
   # New way:
   from eas_3d_pattern.sector import from_preset, Sector
+
   sectors = from_preset("eas", top_border=85.0)  # EAS sectors
-  sectors = Sector()                              # empty instance
+  sectors = Sector()  # empty instance
 
   # Still supported (SectorDefinition classmethod delegates to the preset registry):
   sectors = SectorDefinition.from_preset("eas", top_border=85.0)

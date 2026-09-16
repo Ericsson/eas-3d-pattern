@@ -76,10 +76,11 @@ class PatternProcessing(Metadata):
         Warns:
             DeprecationWarning: Always; ``Pattern_3D`` is scheduled for removal.
         """
+        deprecation_warning = "AntennaPattern.Pattern_3D is deprecated and will be removed in a future release; use AntennaPattern.pattern instead."
+        logger.warning(deprecation_warning)
         warnings.warn(
-            "AntennaPattern.Pattern_3D is deprecated and will be removed in a future "
-            "release; use AntennaPattern.pattern instead.",
-            DeprecationWarning,
+            deprecation_warning,
+            FutureWarning,
             stacklevel=2,
         )
         return self.pattern

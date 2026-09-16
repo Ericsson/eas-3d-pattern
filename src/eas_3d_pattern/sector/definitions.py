@@ -17,7 +17,9 @@ creating an import cycle.
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass
+from typing import Any
 
 from eas_3d_pattern.util_func.guards import verify
 
@@ -64,9 +66,25 @@ class BoundaryBox:
         return f"[{self.theta_min[0]:.1f}{self.theta_min[1]}Theta{self.theta_max[1]}{self.theta_max[0]:.1f}], [{self.phi_min[0]:.1f}{self.phi_min[1]}Phi{self.phi_max[1]}{self.phi_max[0]:.1f}]"
 
 
-# Deprecated alias: the "Square" suffix was redundant. Kept for backward
-# compatibility; scheduled for removal in a future release.
-BoundaryBoxSquare = BoundaryBox
+class BoundaryBoxSquare(BoundaryBox):
+    """Deprecated alias for :class:`BoundaryBox`.
+
+    .. deprecated::
+        The ``"Square"`` suffix was redundant. Use :class:`BoundaryBox` instead.
+        Retained for backward compatibility and scheduled for removal.
+
+    Note:
+        Instances are ``BoundaryBox`` subclass instances, so
+        ``isinstance(x, BoundaryBox)`` holds. Equality is class-sensitive: a
+        ``BoundaryBoxSquare`` never compares equal to a plain ``BoundaryBox`` even
+        with identical fields.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        deprecation_warning = "BoundaryBoxSquare is deprecated; use eas_3d_pattern.sector.BoundaryBox instead."
+        logger.warning(deprecation_warning)
+        warnings.warn(deprecation_warning, FutureWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
 
 
 class Sector:

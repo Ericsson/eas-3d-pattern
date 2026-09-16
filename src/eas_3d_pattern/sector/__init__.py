@@ -10,7 +10,8 @@
 
 Public surface:
 
-- :class:`BoundaryBox` — a single rectangular region (formerly ``BoundaryBoxSquare``).
+- :class:`BoundaryBox` — a single rectangular region.
+- :class:`BoundaryBoxSquare` — deprecated alias of :class:`BoundaryBox`.
 - :class:`Sector` — a named collection of boxes.
 - :class:`SectorDefinition` — deprecated compatibility wrapper over :class:`Sector`.
 - :func:`from_preset`, :func:`preset_names` — preset registry helpers.
