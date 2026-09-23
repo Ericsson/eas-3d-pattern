@@ -2,7 +2,7 @@
 
 Scope is deliberately narrow: the properties that contain *logic* — unit
 conversion — plus the required/optional key split. Properties that are a bare
-``str(self.raw_data[key])`` pass-through are not individually tested; there is
+``str(self.data[key])`` pass-through are not individually tested; there is
 nothing to break in them short of a typo in the key name, and the parser cannot
 construct without the required keys anyway.
 
@@ -10,6 +10,8 @@ These pin behaviour ahead of the planned god-class decomposition.
 """
 
 from __future__ import annotations
+
+from typing import ClassVar
 
 import pytest
 
@@ -177,3 +179,122 @@ class TestRequiredMetadata:
     def test_present_required_key_is_returned(self, pattern_path):
         pattern = load(pattern_path, Supplier="VENDOR")
         assert pattern.supplier == "VENDOR"
+
+
+class TestPassThroughMetadata:
+    """Verbatim string/scalar pass-throughs return exactly what is in the JSON.
+
+    These accessors were moved to ``eas_3d_pattern.ngmn.Metadata`` in the Phase 2a
+    decomposition. Several were previously only *executed* via ``__str__`` without
+    their return value being asserted, and two (``BASTA_AA_WP_version``,
+    ``coordinate_system``) had no coverage at all. This pins the value contract so
+    a wrong JSON key or a botched future move is caught.
+    """
+
+    # (property name, JSON key, stored value)
+    STRING_PASS_THROUGHS: ClassVar = [
+        ("BASTA_AA_WP_version", "BASTA_AA_WP_version", "WP3.0"),
+        ("supplier", "Supplier", "VENDOR"),
+        ("antenna_model", "Antenna_Model", "ANTMODEL1"),
+        ("antenna_type", "Antenna_Type", "Massive MIMO"),
+        ("revision_version", "Revision_Version", "R2"),
+        ("released_date", "Released_Date", "2026-01-01"),
+        ("coordinate_system", "Coordinate_System", "SPCS_Ericsson"),
+        ("pattern_type", "Pattern_Type", "3D"),
+        ("nominal_polarization", "Nominal_Polarization", "+45/-45"),
+        ("optional_comments", "Optional_Comments", "sample comment"),
+    ]
+
+    @pytest.mark.parametrize(
+        ("prop", "key", "value"),
+        STRING_PASS_THROUGHS,
+        ids=[row[0] for row in STRING_PASS_THROUGHS],
+    )
+    def test_string_pass_through_returns_stored_value(
+        self, pattern_path, prop, key, value
+    ):
+        pattern = load(pattern_path, **{key: value})
+        assert getattr(pattern, prop) == value
+
+    # (property name, JSON key, stored value, expected float)
+    SCALAR_PASS_THROUGHS: ClassVar = [
+        ("phi_hpbw", "Phi_HPBW", 65.0, 65.0),
+        ("theta_hpbw", "Theta_HPBW", 7.0, 7.0),
+        ("front_to_back", "Front_to_Back", 30.0, 30.0),
+    ]
+
+    @pytest.mark.parametrize(
+        ("prop", "key", "value", "expected"),
+        SCALAR_PASS_THROUGHS,
+        ids=[row[0] for row in SCALAR_PASS_THROUGHS],
+    )
+    def test_scalar_pass_through_is_float(
+        self, pattern_path, prop, key, value, expected
+    ):
+        pattern = load(pattern_path, **{key: value})
+        result = getattr(pattern, prop)
+        assert isinstance(result, float)
+        assert result == pytest.approx(expected)
+
+    def test_optional_string_present_value_is_returned(self, pattern_path):
+        pattern = load(
+            pattern_path,
+            Configuration="cfgA",
+            Array_ID="A1",
+            Array_Position="top",
+        )
+        assert pattern.configuration == "cfgA"
+        assert pattern.array_id == "A1"
+        assert pattern.array_position == "top"
+
+
+class TestSamplingMetadata:
+    """Sampling grids, raw dataframe and the uniform-sampling flags.
+
+    These accessors were moved to ``eas_3d_pattern.ngmn.Metadata`` in Phase 2c.
+    The bundled fixture always emits uniform sampling triples, so the uniform
+    path is exercised end to end here; the non-uniform (absent-triple) branch of
+    the sampling grids is not reachable through this fixture without a Theta/Phi
+    row-structure, and is left for a future non-uniform fixture.
+    """
+
+    def test_theta_sampling_is_column_vector(self, pattern_path):
+        pattern = AntennaPattern(
+            pattern_path(theta_sampling=[0.0, 5.0, 180.0]), validate=False
+        )
+        theta = pattern.theta_sampling
+        assert theta is not None
+        assert theta.shape == (37, 1)
+        assert theta[0, 0] == pytest.approx(0.0)
+        assert theta[-1, 0] == pytest.approx(180.0)
+
+    def test_phi_sampling_is_row_vector(self, pattern_path):
+        pattern = AntennaPattern(
+            pattern_path(phi_sampling=[-180.0, 5.0, 175.0]), validate=False
+        )
+        phi = pattern.phi_sampling
+        assert phi is not None
+        assert phi.shape == (1, 72)
+        assert phi[0, 0] == pytest.approx(-180.0)
+        assert phi[0, -1] == pytest.approx(175.0)
+
+    def test_raw_pattern_dataframe_has_declared_columns(self, pattern_path):
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        frame = pattern.raw_pattern_dataframe
+        assert list(frame.columns) == [
+            "MagAttenuationTP",
+            "MagAttenuationCo",
+            "MagAttenuationCr",
+        ]
+        assert len(frame) == 37 * 72
+
+    def test_is_uniform_sampling_true_for_triples(self, pattern_path):
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        assert pattern.is_uniform_sampling is True
+
+    def test_is_nonuniform_sampling_warns_and_negates(self, pattern_path):
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        with pytest.warns(FutureWarning, match="is_nonuniform_sampling"):
+            result = pattern.is_nonuniform_sampling
+        assert result is False
+        assert result is (not pattern.is_uniform_sampling)

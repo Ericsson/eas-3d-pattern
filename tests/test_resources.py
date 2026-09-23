@@ -41,11 +41,13 @@ def test_no_deprecated_importlib_resources_apis():
 
 
 def test_sample_data_no_deprecated_warning_and_finds_samples():
-    """Bug 7: reloading sample_data emits no DeprecationWarning and finds samples."""
+    """Bug 7: reloading sample_data emits no deprecation warning and finds samples."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         importlib.reload(sample_data)
 
-    deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+    deprecations = [
+        w for w in caught if issubclass(w.category, DeprecationWarning | FutureWarning)
+    ]
     assert not deprecations, [str(w.message) for w in deprecations]
     assert len(sample_data.SAMPLE_JSON) >= 1

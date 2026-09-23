@@ -5,7 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from eas_3d_pattern import AntennaPattern, SectorDefinition
+from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.sector import Sector
 
 
 def test_top_3db_point_no_crossing_does_not_raise(pattern_path):
@@ -63,7 +64,7 @@ def test_beam_efficiency_zero_overall_power_raises(pattern_path):
         row_structure=["MagAttenuationTP", "MagAttenuationCo", "MagAttenuationCr"],
     )
     pattern = AntennaPattern(path, validate=False)
-    sectors = SectorDefinition(load_default=False)
+    sectors = Sector()
     sectors.add_sector(
         name="all",
         theta_min=(0.0, "<="),

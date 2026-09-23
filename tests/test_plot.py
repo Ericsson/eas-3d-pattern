@@ -146,17 +146,17 @@ class TestPlotContent:
     def test_z_is_the_requested_component(self, pattern, component):
         """The heatmap must carry the requested component, not a hardcoded one."""
         fig = pattern.plot(component_name=component, show_fig=False)
-        expected = pattern.Pattern_3D[component].values
+        expected = pattern.pattern[component].values
         np.testing.assert_allclose(np.asarray(fig.data[0].z), expected)
 
     def test_phi_on_x_and_theta_on_y(self, pattern):
         """Axis assignment must not be transposed."""
         fig = pattern.plot(show_fig=False)
         np.testing.assert_allclose(
-            np.asarray(fig.data[0].x), pattern.Pattern_3D["Phi"].values
+            np.asarray(fig.data[0].x), pattern.pattern["Phi"].values
         )
         np.testing.assert_allclose(
-            np.asarray(fig.data[0].y), pattern.Pattern_3D["Theta"].values
+            np.asarray(fig.data[0].y), pattern.pattern["Theta"].values
         )
 
     def test_theta_axis_is_reversed(self, pattern):
@@ -226,7 +226,7 @@ class TestPlot3DContent:
     def test_surfacecolor_is_the_requested_component(self, pattern, component):
         """Colour must come from the requested component's raw dB values."""
         fig = pattern.plot_3D(component_name=component, show_fig=False)
-        expected = pattern.Pattern_3D[component].values
+        expected = pattern.pattern[component].values
         np.testing.assert_allclose(np.asarray(fig.data[0].surfacecolor), expected)
 
     def test_geometry_is_the_clipped_spherical_projection(self, pattern):
@@ -234,10 +234,10 @@ class TestPlot3DContent:
         db_floor = -30.0
         fig = pattern.plot_3D(db_floor=db_floor, show_fig=False)
 
-        theta = np.radians(pattern.Pattern_3D.coords["Theta"].values)
-        phi = np.radians(pattern.Pattern_3D.coords["Phi"].values)
+        theta = np.radians(pattern.pattern.coords["Theta"].values)
+        phi = np.radians(pattern.pattern.coords["Phi"].values)
         theta_grid, phi_grid = np.meshgrid(theta, phi, indexing="ij")
-        r = np.clip(pattern.Pattern_3D["P_tp_dB"].values, db_floor, None)
+        r = np.clip(pattern.pattern["P_tp_dB"].values, db_floor, None)
         r = r - r.min()
 
         np.testing.assert_allclose(

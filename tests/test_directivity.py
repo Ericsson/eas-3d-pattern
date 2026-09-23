@@ -263,7 +263,7 @@ class TestDirectivityCaching:
         pattern = build_analytic_pattern(tmp_path, sin_squared)
 
         first = pattern.calculate_directivity()
-        assert "dOmega" in pattern.Pattern_3D.data_vars
+        assert "dOmega" in pattern.pattern.data_vars
         second = pattern.calculate_directivity()
 
         assert first == pytest.approx(second, abs=1e-12)
@@ -273,7 +273,7 @@ class TestDirectivityCaching:
         pattern = build_analytic_pattern(tmp_path, sin_squared)
         pattern.calculate_directivity()
 
-        total = float(pattern.Pattern_3D["dOmega"].sum())
+        total = float(pattern.pattern["dOmega"].sum())
         assert total == pytest.approx(4 * np.pi, rel=0.01)
 
 
@@ -295,7 +295,7 @@ class TestLosses:
     def test_missing_gain_raises(self, tmp_path):
         """Loss is undefined without a declared gain, and must not be guessed."""
         pattern = build_analytic_pattern(tmp_path, sin_squared)
-        del pattern.raw_data["Gain"]
+        del pattern.data["Gain"]
 
         with pytest.raises(ValueError, match="(?i)gain"):
             pattern.calculate_losses()

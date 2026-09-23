@@ -89,6 +89,76 @@ def make_pattern_dict():
     return build_pattern_dict
 
 
+def build_nonuniform_pattern_dict(
+    theta_sampling: list[float] | None = None,
+    phi_sampling: list[float] | None = None,
+    peak_theta: float = 90.0,
+    peak_phi: float = 0.0,
+    theta_rolloff: float = 0.05,
+    phi_rolloff: float = 0.01,
+    max_attenuation: float = 40.0,
+    extra: dict | None = None,
+) -> dict:
+    """Build a pattern declaring angles per data row instead of sampling triples.
+
+    NGMN "NonUniformSampling" means Theta and Phi are enumerated on every row rather
+    than derived from a ``[start, step, stop]`` triple. It does not imply irregular
+    spacing — the grid here is the same regular one used by ``build_pattern_dict``,
+    which matches how the bundled non-uniform samples are actually laid out.
+
+    The ``Theta_Sampling`` / ``Phi_Sampling`` keys are omitted entirely, which is what
+    makes ``AntennaPattern`` take the non-uniform branch on load.
+    """
+    theta_sampling = theta_sampling or list(DEFAULT_THETA_SAMPLING)
+    phi_sampling = phi_sampling or list(DEFAULT_PHI_SAMPLING)
+    thetas = _grid(theta_sampling)
+    phis = _grid(phi_sampling)
+
+    rows: list[list[float]] = []
+    for th in thetas:
+        for ph in phis:
+            atten = (
+                theta_rolloff * (th - peak_theta) ** 2
+                + phi_rolloff * (ph - peak_phi) ** 2
+            )
+            atten = float(min(atten, max_attenuation))
+            rows.append([float(th), float(ph), atten, atten, atten + 20.0])
+
+    pattern: dict = {
+        "Coordinate_System": "SPCS_Ericsson",
+        "Gain": {"value": 15.0, "unit": "dBi"},
+        "Phi_HPBW": 65.0,
+        "Theta_HPBW": 7.0,
+        "Front_to_Back": 30.0,
+        "Data_Set_Row_Structure": [
+            "Theta",
+            "Phi",
+            "MagAttenuationTP",
+            "MagAttenuationCo",
+            "MagAttenuationCr",
+        ],
+        "Data_Set": rows,
+    }
+    if extra:
+        pattern.update(extra)
+    return pattern
+
+
+@pytest.fixture
+def nonuniform_pattern_path(tmp_path: Path) -> Callable[..., str]:
+    """Return a factory writing a synthetic non-uniform pattern JSON, returning its path."""
+    counter = {"n": 0}
+
+    def _make(**kwargs) -> str:
+        pattern = build_nonuniform_pattern_dict(**kwargs)
+        counter["n"] += 1
+        file_path = tmp_path / f"nonuniform_pattern_{counter['n']}.json"
+        file_path.write_text(json.dumps(pattern), encoding="utf-8")
+        return str(file_path)
+
+    return _make
+
+
 @pytest.fixture
 def pattern_path(tmp_path: Path) -> Callable[..., str]:
     """Return a factory that writes a synthetic pattern JSON and returns its path."""

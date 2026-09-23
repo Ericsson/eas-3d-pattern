@@ -4,13 +4,53 @@ import json
 import logging
 import os
 import shutil
+from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import requests
 from jsonschema import Draft202012Validator, SchemaError
 
+from .ngmn.loader import validate_against_schema
+
 # --- Logger Configuration ---
 logger = logging.getLogger(__name__)
+
+
+class SchemaSource(Enum):
+    """Where a loaded schema was obtained from.
+
+    This is the *provenance* of a schema, not the outcome of loading it: failure
+    to obtain any schema is signalled by an exception, not by a member here.
+
+    Members:
+        URL: Freshly downloaded from the remote NGMN schema URL.
+        CACHE: Read from the on-disk file cache of a previous download.
+        BUNDLED: Loaded from the copy shipped inside the package.
+    """
+
+    URL = "url"
+    CACHE = "cache"
+    BUNDLED = "bundled"
+
+    def message(self, detail: str) -> str:
+        """Render a human-readable description of this source.
+
+        The enum owns the wording; the caller supplies the source-specific
+        ``detail`` (the URL, or the ``package/filename`` of the bundled copy).
+
+        Args:
+            detail (str): The source-specific locator to embed in the message.
+
+        Returns:
+            str: A description such as ``"Downloaded from URL (https://...)"``.
+        """
+        templates = {
+            SchemaSource.URL: "Downloaded from URL ({detail})",
+            SchemaSource.CACHE: "Loaded from file cache ({detail})",
+            SchemaSource.BUNDLED: "Bundled Schema ({detail})",
+        }
+        return templates[self].format(detail=detail)
 
 # --- Schema Configuration ---
 # Schema URL to always get the latest version
@@ -26,6 +66,16 @@ BUNDLED_SCHEMA_PACKAGE_REF = "eas_3d_pattern.schemas"
 CACHE_DIR_NAME = ".ngmn_json_schema_cache"  # Cache directory
 # CACHE_EXPIRY_SECONDS = 24 * 60 * 60  # Cache schemas for 1 day
 REQUESTS_TIMEOUT_SECONDS = 10  # Timeout for fetching schema from URL
+
+# JSON Schema draft this manager is configured to validate against. The loaded
+# schema's "$schema" dialect must match this, or loading is rejected.
+SCHEMA_VERSION = "2020-12"
+
+# Maps a JSON Schema "$schema" dialect URI to the short version this manager uses.
+_SCHEMA_DIALECT_VERSIONS = {
+    "https://json-schema.org/draft/2020-12/schema": "2020-12",
+    "http://json-schema.org/draft/2020-12/schema#": "2020-12",
+}
 
 
 class SchemaManager:
@@ -44,10 +94,12 @@ class SchemaManager:
         self.cache_dir_name = CACHE_DIR_NAME
         # self.cache_expiry_seconds = CACHE_EXPIRY_SECONDS
         self.requests_timeout = REQUESTS_TIMEOUT_SECONDS
+        self.schema_version = SCHEMA_VERSION
         self.cache_root_dir = os.path.abspath(self.cache_dir_name)
 
         self.schema_content: dict[str, Any] | None = None
-        self.source_message: str = "Schema loading not yet attempted."
+        self.schema_source: SchemaSource | None = None
+        self._source_detail: str = ""
 
         # Clear cache -> ensure cache dir exists -> load and validate schema from URL or fallback to bundled schema -> save to cache
         self._clear_cache_directory()
@@ -60,6 +112,44 @@ class SchemaManager:
             raise RuntimeError(msg)
         logger.info(
             f"SchemaManager: JSON NGMN Schema initialized succesfully. Schema source: {self.source_message}"
+        )
+
+    @property
+    def source_message(self) -> str:
+        """Human-readable description of where the schema was loaded from.
+
+        Derived from :attr:`schema_source`; returns a not-yet-loaded marker while
+        no source has been recorded.
+        """
+        if self.schema_source is None:
+            return "Schema loading not yet attempted."
+        return self.schema_source.message(self._source_detail)
+
+    def _set_source(self, source: SchemaSource, detail: str) -> None:
+        self.schema_source = source
+        self._source_detail = detail
+
+    def validate(self, data: dict[str, Any], data_filepath: str | Path) -> None:
+        """Validate pattern data against this manager's loaded schema.
+
+        Convenience wrapper that supplies this manager's own schema content and
+        source description to the pure ``validate_against_schema`` mechanism, so
+        callers do not need to reach into the manager's internals.
+
+        Args:
+            data (dict[str, Any]): Normalized pattern payload to validate.
+            data_filepath (str | Path): Source file, named in any error for diagnosis.
+
+        Raises:
+            ValueError: If no schema is available to validate against.
+            ValidationError: If the data does not conform to the schema.
+        """
+        if self.schema_content is None:
+            msg = "Validation requested but no schema is available."
+            logger.error(f"SchemaManager: {msg}")
+            raise ValueError(msg)
+        validate_against_schema(
+            data, self.schema_content, data_filepath, self.source_message
         )
 
     ##### Cache management #####
@@ -126,7 +216,7 @@ class SchemaManager:
             response = requests.get(self.schema_url, timeout=self.requests_timeout)
             response.raise_for_status()
             content = response.json()
-            self.source_message = f"Downloaded from URL ({self.schema_url})"
+            self._set_source(SchemaSource.URL, self.schema_url)
             logger.info(
                 f"SchemaManager: Successfully downloaded schema: {self.source_message}"
             )
@@ -166,8 +256,9 @@ class SchemaManager:
             )
             with schema_resource.open(encoding="utf-8") as sf:
                 content = json.load(sf)
-            self.source_message = (
-                f"Bundled Schema ({self.bundled_package_ref}/{self.bundled_filename})"
+            self._set_source(
+                SchemaSource.BUNDLED,
+                f"{self.bundled_package_ref}/{self.bundled_filename}",
             )
             logger.info(
                 f"SchemaManager: Successfully loaded schema: {self.source_message}"
@@ -192,8 +283,11 @@ class SchemaManager:
             )
             loaded_content = self._load_bundled()
 
+        self._verify_schema_version(loaded_content)
+        validator = self._validator_for_configured_version()
+
         try:
-            Draft202012Validator.check_schema(loaded_content)
+            validator.check_schema(loaded_content)
             logger.info(
                 f"SchemaManager: Schema ({self.source_message}) meta-validation successful."
             )
@@ -205,6 +299,45 @@ class SchemaManager:
             raise SchemaError(
                 f"Schema obtained from '{self.source_message}' is invalid."
             ) from e
+
+    def _verify_schema_version(self, loaded_content: dict[str, Any]) -> None:
+        """Reject a loaded schema whose dialect differs from the configured version.
+
+        Args:
+            loaded_content (dict[str, Any]): The schema just loaded, before use.
+
+        Raises:
+            SchemaError: If the schema declares no ``$schema`` dialect, or one that
+                does not match :attr:`schema_version` — the manager is not
+                configured to validate against that version.
+        """
+        dialect = loaded_content.get("$schema")
+        declared_version = _SCHEMA_DIALECT_VERSIONS.get(dialect) if dialect else None
+        if declared_version != self.schema_version:
+            msg = (
+                f"SchemaManager is not configured for the loaded schema version: "
+                f"declared '$schema'={dialect!r} (version {declared_version!r}), "
+                f"configured version {self.schema_version!r}."
+            )
+            logger.error(msg)
+            raise SchemaError(msg)
+
+    def _validator_for_configured_version(self) -> type[Draft202012Validator]:
+        """Select the validator class for the configured schema version.
+
+        Raises:
+            ValueError: If :attr:`schema_version` is not one this manager supports.
+
+        Returns:
+            type[Draft202012Validator]: The matching jsonschema validator class.
+        """
+        match self.schema_version:
+            case "2020-12":
+                return Draft202012Validator
+            case _:
+                msg = f"Unsupported schema version configured: {self.schema_version!r}."
+                logger.error(msg)
+                raise ValueError(msg)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id=0x{id(self):x}, schema_loaded={'True' if self.schema_content else 'False'}, source={self.source_message})>"

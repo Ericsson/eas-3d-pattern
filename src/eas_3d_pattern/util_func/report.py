@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from ..parser import AntennaPattern
-from ..sector_definitions import SectorDefinition
+from ..sector import Sector, from_preset
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +76,11 @@ def generate_report_eas(
         ... )  # with own subband
     """
     input_directory = Path(input_directory)
+    output_directory = Path(output_directory)
+
     files = list(input_directory.glob("*.[jJ][sS][oO][nN]"))
     if len(files) == 0:
-        raise ValueError("Report: No .json files found in the directory.")
-    output_directory = Path(output_directory)
+        raise ValueError(f"Report: No .json files found in the input directory: {input_directory}")
     output_directory.mkdir(parents=True, exist_ok=True)
 
     df_list: list[pd.DataFrame] = []
@@ -117,14 +118,14 @@ def generate_report_eas(
 
 def _process_a_file(
     file_path: Path,
-) -> tuple[pd.DataFrame, AntennaPattern, SectorDefinition] | None:
+) -> tuple[pd.DataFrame, AntennaPattern, Sector] | None:
     """Process a file and return the processed data.
 
     Args:
         file_path (Path): The path to the file to be processed.
 
     Returns:
-        tuple[pd.DataFrame, AntennaPattern, SectorDefinition] | None:
+        tuple[pd.DataFrame, AntennaPattern, Sector] | None:
             A tuple containing the processed data, the AntennaPattern instance,
             and the SectorDefinition instance. If an exception is raised, None is
             returned.
@@ -136,8 +137,8 @@ def _process_a_file(
         pattern = AntennaPattern(str(file_path), validate=False)
         data = pattern.get_metadata_dict()
         top_border = pattern.calculate_top_3db_point(power=False)
-        eas_sectors = SectorDefinition(load_default=True, top_border=top_border)
-        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] < -20):
+        eas_sectors = from_preset("eas", top_border=top_border)
+        if (data["Phi_HPBW"] <= 50) & (pattern.pattern.peak_coordinates[1] < -20):
             logger.info(
                 "Reporting: Identified dual beam antenna. Overwriting sectors to dual beam definition for reporting."
             )
@@ -155,7 +156,7 @@ def _process_a_file(
                 phi_min=(0.0, "<"),
                 phi_max=(180.0, "<="),
             )
-        if (data["Phi_HPBW"] <= 50) & (pattern.Pattern_3D.peak_coordinates[1] > 20):
+        if (data["Phi_HPBW"] <= 50) & (pattern.pattern.peak_coordinates[1] > 20):
             logger.info(
                 "Reporting: Identified dual beam antenna. Changing sectors to dual beam definition for reporting."
             )
@@ -197,7 +198,7 @@ def _process_a_file(
 
 def _save_figure(
     pattern: AntennaPattern,
-    sector_definitions: SectorDefinition,
+    sector_definitions: Sector,
     output_directory: Path,
     remove_layout_components: bool = False,
 ) -> None:
@@ -301,5 +302,5 @@ def _generate_excel_report(
         df_per_arrayandsubband_per_tilt.to_excel(
             writer, index=False, sheet_name="Mean_ArrayID_Subband_Tilt"
         )
-    logger.info("Report: ✨Generated EAS BE report in %s✨", report_name)
+    logger.info("Report: Generated EAS BE report in %s", report_name)
     return None

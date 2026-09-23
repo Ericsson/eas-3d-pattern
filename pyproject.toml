@@ -169,9 +169,14 @@ testpaths = ["tests"]
 addopts = "-q"
 markers = [
     "image: compares a rendered figure against a PNG baseline; deselect with -m 'not image' if a runner's renderer differs",
+    "slow: exercises a multi-megabyte bundled sample; deselect with -m 'not slow'",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
+    # The library's own deprecations are FutureWarning (visible to end users by
+    # default). Promote them to errors so internal code and tests cannot quietly
+    # depend on a deprecated entry point; assert them with pytest.warns instead.
+    "error::FutureWarning",
 ]
 
 [tool.mypy]

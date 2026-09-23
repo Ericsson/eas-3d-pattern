@@ -8,15 +8,15 @@ parser normalizes known variants on load via the module-level ALTERNATIVES map.
 from __future__ import annotations
 
 from eas_3d_pattern import AntennaPattern
+from eas_3d_pattern.ngmn.loader import normalize_keys
 
 
 def _normalize(data: dict) -> dict:
-    """Call ``_normalize_json`` in isolation.
+    """Call the key-normalization helper directly.
 
-    The method does not use ``self``, so it can be invoked unbound for a fast,
-    construction-free unit test of the mapping logic.
+    It is a pure function over the payload, so it needs no ``AntennaPattern``.
     """
-    return AntennaPattern._normalize_json(None, data)  # type: ignore[arg-type]
+    return normalize_keys(data)
 
 
 def test_canonical_key_passes_through_unchanged():
@@ -48,5 +48,5 @@ def test_construction_normalizes_theta_tilt(pattern_path):
     """End-to-end: a file using 'Theta_Tilt' is normalized during init (issue #5)."""
     path = pattern_path(extra={"Theta_Tilt": 6.0})
     pattern = AntennaPattern(path, validate=False)
-    assert pattern.raw_data["Theta_Electrical_Tilt"] == 6.0
-    assert "Theta_Tilt" not in pattern.raw_data
+    assert pattern.data["Theta_Electrical_Tilt"] == 6.0
+    assert "Theta_Tilt" not in pattern.data
