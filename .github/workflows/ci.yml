@@ -43,7 +43,10 @@ jobs:
           pip install poetry poetry-dynamic-versioning
           poetry install --only main,dev
       - name: Pytest
-        run: poetry run pytest
+        # Baseline image tests excluded: plotly/kaleido renders differ across
+        # machines (Chromium build + fonts), causing false failures. See plan.md
+        # "Understand cross-machine image baseline instability" (ties to §2.7 / M2-13).
+        run: poetry run pytest -m "not image"
 
   build:
     name: Build (Python ${{ matrix.python-version }})
