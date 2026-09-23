@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.0] - 23-09-2026
+
 ### Added
 
 - This changelog.
@@ -162,5 +164,6 @@ Released prior to the introduction of this changelog. See the
 [GitHub releases](https://github.com/Ericsson/eas-3d-pattern/releases) page for
 notes on this and earlier versions.
 
-[Unreleased]: https://github.com/Ericsson/eas-3d-pattern/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/Ericsson/eas-3d-pattern/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/Ericsson/eas-3d-pattern/compare/v0.1.4...v0.2.0
 [v0.1.4]: https://github.com/Ericsson/eas-3d-pattern/releases/tag/v0.1.4
