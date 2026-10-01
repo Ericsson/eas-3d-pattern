@@ -57,15 +57,16 @@ class AntennaPattern(PatternProcessing):
         FileNotFoundError: If data_filepath does not exist.
     """
 
-    def __init__(self,
-                 data_filepath: str | Path,
-                 validate: bool = False):
+    def __init__(self, data_filepath: str | Path, validate: bool = False):
         path = Path(data_filepath)
         verify(path.exists(), f"Data file not found: {path}", FileNotFoundError)
         self.data_filepath: Path = path
 
         self.data: dict[str, Any] = json_load(self.data_filepath)
-        verify(self.data.get("Data_Set"), f"'Data_Set' is empty or missing in {self.data_filepath}.")
+        verify(
+            self.data.get("Data_Set"),
+            f"'Data_Set' is empty or missing in {self.data_filepath}.",
+        )
 
         if validate:
             NGMNSchema.validate(self.data, self.data_filepath)
@@ -185,16 +186,25 @@ class AntennaPattern(PatternProcessing):
         if self._sector_preset == "ngmn-v13-type-a":
             theta_peak, _ = self.find_peak_coordinates()
             theta_hpbw = self.data.get("Theta_HPBW")
-            phi_hpbw = self.data.get("Phi_HPBW")
-            verify(theta_hpbw is not None, "'Theta_HPBW' not in the pattern metadata, required for NGMN type A.")
-            verify(phi_hpbw is not None, "'Phi_HPBW' not in the pattern metadata, required for NGMN type A.")
+            verify(
+                theta_hpbw is not None,
+                "'Theta_HPBW' not in the pattern metadata, required for NGMN type A.",
+            )
             phi_nominal = self.phi_electrical_pan or 0.0
+            nominal_sector_phi = self.data.get("Nominal_Sector_Phi")
+            if nominal_sector_phi is None:
+                logger.warning(
+                    "Nominal_Sector_Phi not found in pattern metadata, using NGMN default of 120.0°."
+                )
+                # NGMN BASTA V13.0 §7.3.2: 120° is the standard nominal sector
+                # for a three-sector macro deployment.
+                nominal_sector_phi = 120.0
             return from_preset(
                 "ngmn-v13-type-a",
                 theta_beam_peak=theta_peak,
                 theta_hpbw=float(cast("float", theta_hpbw)),
                 phi_nominal_direction=phi_nominal,
-                nominal_sector_phi=float(cast("float", phi_hpbw)),
+                nominal_sector_phi=float(nominal_sector_phi),
             )
 
         # Fallback for future presets registered externally
@@ -286,9 +296,7 @@ class AntennaPattern(PatternProcessing):
             float: Theta border for the top 3db point in degrees.
         """
         theta_val_peak, phi_val_peak = self.find_peak_coordinates(power)
-        top_border = top_3db_border(
-            self.pattern, theta_val_peak, phi_val_peak, power
-        )
+        top_border = top_3db_border(self.pattern, theta_val_peak, phi_val_peak, power)
         # enrich with top_3db_point
         self.pattern.attrs["top_3db_point"] = top_border
         return top_border

@@ -57,7 +57,8 @@ def find_peak(pattern: xr.Dataset, power: bool = False) -> tuple[float, float]:
     """Find the Theta/Phi coordinates of the pattern peak.
 
     Searches for the maximum value within the pattern data array. If two points
-    represent a maximum value, the first one is returned.
+    represent a maximum value, the first one in (Theta, Phi) row-major order is
+    returned.
 
     Args:
         pattern (xr.Dataset): Processed pattern dataset.
@@ -65,22 +66,26 @@ def find_peak(pattern: xr.Dataset, power: bool = False) -> tuple[float, float]:
             the co-polarized one. Defaults to False.
 
     Raises:
-        ValueError: If the component yields no peak coordinate pair, which happens
-            when the dataset is not indexed by both Theta and Phi.
+        ValueError: If the component is not a two-dimensional (Theta, Phi) array,
+            which happens when the dataset is not indexed by both coordinates, or
+            if the component contains any NaN value. Note that this rejects
+            incomplete patterns outright rather than searching around the gaps.
 
     Returns:
         tuple[float, float]: (theta, phi) coordinates of the peak in degrees.
     """
     component = component_name(power)
     logger.debug(f"AntennaPattern: Searching for peak of component {component}")
+    values = pattern[component].values
+    verify(values.ndim == 2, f"AntennaPattern: Error pattern[{component}] expected to have 2 dimensions, found: {values.ndim}")
+    verify(not np.all(np.isnan(values)), f"AntennaPattern: Error, All values are NaN in pattern[{component}]")
+    max_indexes = np.unravel_index(np.nanargmax(values), values.shape)
     peak_tuple = (
-        pattern.stack(pt=("Theta", "Phi")).idxmax("pt")[component].values.item()
+        pattern["Theta"].values[max_indexes[0]].astype(np.float64),
+        pattern["Phi"].values[max_indexes[1]].astype(np.float64)
     )
-    verify(isinstance(peak_tuple, tuple),
-           "AntennaPattern: Failed to find peak coordinates for the component. Make sure to select a component with data.")
-    theta_val_peak, phi_val_peak = peak_tuple
     logger.debug(f"AntennaPattern: Peak coordinates found: {peak_tuple}")
-    return theta_val_peak, phi_val_peak
+    return peak_tuple
 
 
 def top_3db_border(

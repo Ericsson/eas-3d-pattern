@@ -19,11 +19,11 @@ section 2.1.3).
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
+import msgspec
 from jsonschema import ValidationError, validate
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,10 @@ def json_load(filepath: str | Path,
 def load_json_file(filepath: str | Path) -> dict[str, Any]:
     """Read a JSON pattern file from disk.
 
+    Parsing uses :func:`msgspec.json.decode` over the raw file bytes, which is
+    several times faster than the standard library on the large numeric
+    ``Data_Set`` block while returning the same plain ``dict`` payload.
+
     Args:
         filepath (str | Path): Path to the JSON data file.
 
@@ -71,14 +75,15 @@ def load_json_file(filepath: str | Path) -> dict[str, Any]:
     """
     logger.debug(f"AntennaPattern: Loading user data from: {filepath}")
     try:
-        with open(filepath, encoding="utf-8") as f:
-            return json.load(f)  # type: ignore[no-any-return]
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in user data file {filepath}: {e}")
-        raise ValueError(f"Invalid JSON in user data file {filepath}: {e}") from e
+        raw = Path(filepath).read_bytes()
     except OSError as e:
         logger.error(f"Could not read user data file {filepath}: {e}")
         raise OSError(f"Could not read user data file {filepath}: {e}") from e
+    try:
+        return msgspec.json.decode(raw)  # type: ignore[no-any-return]
+    except msgspec.DecodeError as e:
+        logger.error(f"Invalid JSON in user data file {filepath}: {e}")
+        raise ValueError(f"Invalid JSON in user data file {filepath}: {e}") from e
 
 
 def normalize_keys(data: dict[str, Any]) -> dict[str, Any]:

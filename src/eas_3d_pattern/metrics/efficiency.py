@@ -24,10 +24,10 @@ section 2.1.3).
 from __future__ import annotations
 
 import logging
-import operator
-from collections.abc import Callable
 from types import MappingProxyType
+from typing import Literal
 
+import numpy as np
 import xarray as xr
 
 from eas_3d_pattern.metrics.quadrature import DOMEGA, ensure_domega
@@ -41,17 +41,10 @@ POWER_COMPONENT_LIN = "P_tp_lin"
 #: Component holding the linear co-polar pattern.
 COPOLAR_COMPONENT_LIN = "P_co_lin"
 
-#: Comparison operators a sector boundary may declare. Read-only lookup table.
-BOUNDARY_OPERATORS: MappingProxyType[str, Callable[[float, float], bool]] = (
-    MappingProxyType(
-        {
-            "<": operator.lt,
-            "<=": operator.le,
-            ">": operator.gt,
-            ">=": operator.ge,
-        }
-    )
-)
+#: searchsorted side realizing each lower-bound operator. "<=" keeps the bound, "<" drops it.
+LOWER_BOUND_SIDE: MappingProxyType[str, Literal["left", "right"]] = MappingProxyType({"<=": "left", "<": "right"})
+#: searchsorted side realizing each upper-bound operator. "<=" keeps the bound, "<" drops it.
+UPPER_BOUND_SIDE: MappingProxyType[str, Literal["left", "right"]] = MappingProxyType({"<=": "right", "<": "left"})
 
 
 def beam_efficiency(
@@ -87,7 +80,14 @@ def beam_efficiency(
     ensure_domega(pattern)
 
     weighted_field_values = pattern[DOMEGA] * field_values
-    Sp_overall = float(weighted_field_values.sum())
+    theta = weighted_field_values.Theta.values
+    phi = weighted_field_values.Phi.values
+    values = weighted_field_values.values
+
+    verify(bool(np.all(np.diff(theta) > 0) and np.all(np.diff(phi) > 0)),
+             "beam_efficiency: Theta and Phi coordinates must be sorted ascending.")
+
+    Sp_overall = float(np.nansum(values))
     verify(Sp_overall != 0, "Overall power is zero; cannot compute beam efficiency.")
 
     efficiency = {}
@@ -95,34 +95,49 @@ def beam_efficiency(
         verify(isinstance(box, BoundaryBox),
                f"Sector Definitions need to be class 'BoundaryBox' but is class {type(box)}.",
                TypeError)
-        efficiency[sector_name] = float(
-            _sector_sum(weighted_field_values, box) / Sp_overall
-        )
+        efficiency[sector_name] = _sector_sum(values, theta, phi, box) / Sp_overall
 
     return efficiency
 
 
 def _sector_sum(
-    weighted_field_values: xr.DataArray, box: BoundaryBox
-) -> xr.DataArray:
+    values: np.ndarray,
+    theta: np.ndarray,
+    phi: np.ndarray,
+    box: BoundaryBox
+) -> float:
     """Sum the weighted field inside one rectangular sector.
 
+    The sector is axis-aligned, so its bounds are separable: each one maps to an
+    index range on a single sorted coordinate axis, found by binary search. The
+    two ranges together address the sector as a contiguous block of ``values``,
+    which is summed as a view without building a mask or copying the data.
+
+    Each bound carries the comparison operator that decides whether the boundary
+    coordinate itself belongs to the sector. That choice is expressed as the
+    ``side`` argument of :func:`numpy.searchsorted` via :data:`LOWER_BOUND_SIDE`
+    and :data:`UPPER_BOUND_SIDE`; an inverted ``side`` silently shifts a sector
+    edge by one grid step rather than raising.
+
+    NaN cells are skipped, matching the overall sum in :func:`beam_efficiency`.
+    They arise from components the source file never declared and from incomplete
+    grids.
+
     Args:
-        weighted_field_values (xr.DataArray): Field already multiplied by ``dOmega``.
+        values (np.ndarray): The dOmega-weighted field as a 2D array indexed
+            ``[theta, phi]``.
+        theta (np.ndarray): Theta coordinates in degrees, sorted ascending. The
+            caller guarantees the ordering; it is not re-checked here.
+        phi (np.ndarray): Phi coordinates in degrees, sorted ascending. The caller
+            guarantees the ordering; it is not re-checked here.
         box (BoundaryBox): Theta/Phi bounds, each paired with the comparison
             operator to apply.
 
     Returns:
-        xr.DataArray: Zero-dimensional array holding the weighted power inside the sector.
+        float: Weighted power inside the sector.
     """
-    theta = weighted_field_values.Theta
-    phi = weighted_field_values.Phi
-    return (
-        weighted_field_values.where(
-            BOUNDARY_OPERATORS[box.theta_min[1]](box.theta_min[0], theta), drop=True
-        )
-        .where(BOUNDARY_OPERATORS[box.theta_max[1]](theta, box.theta_max[0]), drop=True)
-        .where(BOUNDARY_OPERATORS[box.phi_min[1]](box.phi_min[0], phi), drop=True)
-        .where(BOUNDARY_OPERATORS[box.phi_max[1]](phi, box.phi_max[0]), drop=True)
-        .sum()
-    )
+    theta_start = int(np.searchsorted(theta, box.theta_min[0], side=LOWER_BOUND_SIDE[box.theta_min[1]]))
+    theta_stop = int(np.searchsorted(theta, box.theta_max[0], side=UPPER_BOUND_SIDE[box.theta_max[1]]))
+    phi_start = int(np.searchsorted(phi, box.phi_min[0], side=LOWER_BOUND_SIDE[box.phi_min[1]]))
+    phi_stop = int(np.searchsorted(phi, box.phi_max[0], side=UPPER_BOUND_SIDE[box.phi_max[1]]))
+    return float(np.nansum(values[theta_start:theta_stop, phi_start:phi_stop]))

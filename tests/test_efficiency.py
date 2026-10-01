@@ -71,16 +71,44 @@ class TestDefaultEasPreset:
 
 
 class TestNgmnTypeAMetadataGuard:
-    """The Type A preset needs HPBW metadata and must say so."""
+    """The Type A preset needs Theta_HPBW metadata and must say so."""
 
-    @pytest.mark.parametrize("missing_key", ["Theta_HPBW", "Phi_HPBW"])
-    def test_missing_hpbw_raises(self, pattern_path, missing_key):
+    def test_missing_theta_hpbw_raises(self, pattern_path):
         pattern = AntennaPattern(pattern_path(), validate=False)
         pattern.sector_preset = "ngmn-v13-type-a"
-        del pattern.data[missing_key]
+        del pattern.data["Theta_HPBW"]
 
-        with pytest.raises(ValueError, match="(?i)hpbw"):
+        with pytest.raises(ValueError, match="(?i)theta_hpbw"):
             pattern.calculate_beam_efficiency()
+
+    def test_nominal_sector_phi_drives_boundary_not_phi_hpbw(self, pattern_path):
+        """The phi sector width must come from Nominal_Sector_Phi, never Phi_HPBW.
+
+        Regression guard for the Type A preset bug where Phi_HPBW was passed as the
+        nominal sector angle. The two must differ for the test to discriminate.
+        """
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        pattern.sector_preset = "ngmn-v13-type-a"
+        pattern.data["Nominal_Sector_Phi"] = 120.0
+        pattern.data["Phi_HPBW"] = 65.0
+
+        sector = pattern._build_sectors_from_preset()
+        service = sector.sectors["Service"]
+        phi_span = service.phi_max[0] - service.phi_min[0]
+
+        assert phi_span == pytest.approx(120.0)
+
+    def test_missing_nominal_sector_phi_defaults_to_120(self, pattern_path):
+        """An absent Nominal_Sector_Phi falls back to the NGMN 120° macro default."""
+        pattern = AntennaPattern(pattern_path(), validate=False)
+        pattern.sector_preset = "ngmn-v13-type-a"
+        pattern.data.pop("Nominal_Sector_Phi", None)
+
+        sector = pattern._build_sectors_from_preset()
+        service = sector.sectors["Service"]
+        phi_span = service.phi_max[0] - service.phi_min[0]
+
+        assert phi_span == pytest.approx(120.0)
 
 
 class TestExternallyRegisteredPreset:
