@@ -18,7 +18,6 @@ power over each. The difference is **how the region boundaries are chosen** and
 | Elevation (θ) borders | **Mostly fixed** constants (70°, 165°, 180°); only the top border is beam-derived | **Beam-derived**: ϑ₁, ϑ₂ computed from beam peak and elevation HPBW (ϑ₃ = 165° is a fixed constant) |
 | Azimuth (φ) borders | **Fixed** ±60° around boresight | **Configurable** sector `[φ₁, φ₂]` from the nominal sector direction and width |
 | Inputs | `top_border` (typically the −3 dB point) | `theta_beam_peak`, `theta_hpbw`, `phi_nominal_direction`, `nominal_sector_phi` |
-| Adapts to the beam? | Only the top border | Yes — elevation regions track the beam's peak and width |
 
 ## EAS
 
@@ -65,10 +64,9 @@ Values outside these raise a `ValueError`.
 
 ## In short
 
-EAS answers "how much power lands in a fixed set of angular buckets," while NGMN
-Type A answers "how much power lands in regions defined relative to *this* beam"
-(Angular Region Efficiency) — a beam-specific figure of merit for spatial focusing,
-comparable across antennas because the regions are defined by each beam's own geometry.
+EAS walks from the beam peak backward to identify dinamically the 3db intersection point.
+While, NGMN uses metrics provided in the JSON input file to define the reagion.
+From testing the variation on average tends to 0.
 
 ## Extending
 

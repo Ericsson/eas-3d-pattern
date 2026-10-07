@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.1] - 07-10-2026
+
+### Fixed
+
+- NGMN Type A sector preset: corrected the sector phi source.
+
+### Performance
+
+- Faster per-file processing on three hot paths:
+  - `load_json_file()` decodes with `msgspec.json` instead of the stdlib `json` module (~2.6x).
+  - `_sector_sum()` uses `searchsorted` block slicing instead of chained `where` masks (~350x).
+  - `find_peak()` uses `nanargmax` instead of a stack/`idxmax` reduction (~100x).
+
+### Added
+
+- `msgspec` runtime dependency (`>=0.19.0,<1.0.0`).
+- Regression tests for the NGMN Type A sector phi source.
+
 ## [v0.2.0] - 23-09-2026
 
 ### Added
